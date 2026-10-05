@@ -5,6 +5,7 @@ from src.ingestion.ocr_engine import OCREngine, ocr_engine
 from src.ingestion.quality_checker import QualityChecker, quality_checker
 from src.ingestion.table_extractor import TableExtractor, table_extractor
 from src.ingestion.header_footer import HeaderFooterDetector, header_footer_detector
+from src.ingestion.chunker import Chunker, chunk_document
 
 __all__ = [
     "PDFExtractor",
@@ -17,4 +18,6 @@ __all__ = [
     "table_extractor",
     "HeaderFooterDetector",
     "header_footer_detector",
+    "Chunker",
+    "chunk_document",
 ]

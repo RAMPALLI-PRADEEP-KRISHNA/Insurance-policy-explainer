@@ -32,8 +32,11 @@ class ExtractionMethod(str, Enum):
 
 class ChunkType(str, Enum):
     """Structural classification of a document chunk."""
-    SECTION_HEADING = "SECTION_HEADING"
+    HEADING = "HEADING"
+    SECTION_HEADING = "SECTION_HEADING"  # Backward-compatible alias
+    CLAUSE = "CLAUSE"
     PARAGRAPH = "PARAGRAPH"
+    TEXT = "TEXT"
     LIST_ITEM = "LIST_ITEM"
     TABLE = "TABLE"      # Complete table kept intact without mid-row splitting
     UNKNOWN = "UNKNOWN"
@@ -80,12 +83,14 @@ class Page(BaseModel):
 
 class Chunk(BaseModel):
     """The fundamental unit of retrieval in the RAG pipeline."""
-    chunk_id: str = Field(..., description="UUID4 unique identifier")
+    chunk_id: str = Field(..., description="Deterministic or unique identifier")
     doc_id: str = Field(..., description="Foreign key to Document.doc_id")
     filename: str = Field(..., description="Source filename for display traceability")
-    page_number: int = Field(..., ge=1, description="1-indexed start page of chunk")
+    page_number: int = Field(..., ge=1, description="1-indexed primary/start page of chunk")
     page_numbers: List[int] = Field(..., min_length=1, description="All pages this chunk spans")
     section: Optional[str] = Field(default=None, description="Associated section heading if detected")
+    subsection: Optional[str] = Field(default=None, description="Associated subsection heading if detected")
+    table_index: Optional[int] = Field(default=None, description="Table index on page if chunk is a TABLE")
     chunk_type: ChunkType = ChunkType.UNKNOWN
     text: str = Field(..., min_length=1, description="Chunk content text")
     char_count: int = Field(default=0, ge=0)

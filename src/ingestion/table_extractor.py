@@ -81,6 +81,13 @@ class TableExtractor:
                     if (not any(headers) or not headers) and rows:
                         headers = rows[0]
                         rows = rows[1:]
+                    elif headers and rows:
+                        # Conservative deduplication: PyMuPDF's tab.extract() often includes the header row.
+                        # Only drop rows[0] if its text cells match the extracted headers exactly (case-insensitive).
+                        clean_h = [h.strip().lower() for h in headers]
+                        clean_r0 = [str(c).strip().lower() for c in rows[0]]
+                        if clean_h == clean_r0:
+                            rows = rows[1:]
 
                     col_count = max(len(headers), max((len(r) for r in rows), default=0))
                     row_count = len(rows)
