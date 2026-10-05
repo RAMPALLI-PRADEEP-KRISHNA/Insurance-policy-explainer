@@ -86,3 +86,29 @@ class EvidenceValidationError(InsuranceExplainerError):
     """Raised when evidence evaluation fails."""
     pass
 
+
+class GenerationError(InsuranceExplainerError):
+    """Base exception for LLM generation errors."""
+    pass
+
+
+class ModelUnavailableError(GenerationError):
+    """Raised when the configured Gemini model is unavailable or invalid."""
+    pass
+
+
+class MissingAPIKeyError(GenerationError):
+    """Raised when GEMINI_API_KEY is required but not configured."""
+    pass
+
+
+class GenerationTimeoutError(GenerationError):
+    """Raised when LLM invocation times out."""
+    pass
+
+
+class MalformedOutputError(GenerationError):
+    """Raised when the LLM returns empty or unparseable structured output."""
+    pass
+
+

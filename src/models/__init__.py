@@ -13,6 +13,8 @@ from src.models.data_models import (
     EvidenceStatus,
     RetrievalResult,
     Evidence,
+    Citation,
+    GroundedAnswer,
 )
 
 __all__ = [
@@ -28,4 +30,6 @@ __all__ = [
     "EvidenceStatus",
     "RetrievalResult",
     "Evidence",
+    "Citation",
+    "GroundedAnswer",
 ]

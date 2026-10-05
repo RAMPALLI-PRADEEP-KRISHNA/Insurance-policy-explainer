@@ -228,3 +228,30 @@ class Evidence(BaseModel):
     total_candidates: int = Field(default=0, ge=0, description="Total candidates evaluated before thresholding")
 
 
+class Citation(BaseModel):
+    """Authoritative citation pointing strictly to an indexed document chunk."""
+    document_id: str = Field(..., description="Foreign key to Document.doc_id")
+    chunk_id: str = Field(..., description="Foreign key to Chunk.chunk_id")
+    filename: str = Field(..., description="Source policy filename")
+    page_number: int = Field(..., ge=1, description="Primary 1-indexed page number")
+    page_numbers: List[int] = Field(..., min_length=1, description="All pages spanned by the cited chunk")
+    section: Optional[str] = Field(default=None, description="Section heading")
+    heading: Optional[str] = Field(default=None, description="Subsection or clause heading")
+    source_snippet: str = Field(..., description="Verbatim text snippet from the cited chunk")
+
+
+class GroundedAnswer(BaseModel):
+    """Canonical final answer grounded strictly in verified policy evidence."""
+    query: str = Field(..., description="Original user query")
+    answer: str = Field(..., description="Grounded answer text in plain English or Tamil")
+    language: str = Field(default="en", description="Language code: 'en' or 'ta'")
+    evidence_status: EvidenceStatus = Field(..., description="Validated evidence state")
+    citations: List[Citation] = Field(default_factory=list, description="Authoritative citations derived from chunk metadata")
+    supporting_chunk_ids: List[str] = Field(default_factory=list, description="IDs of chunks directly supporting the answer")
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0, description="Confidence score inherited from retrieval/evidence validation")
+    detected_conflicts: List[str] = Field(default_factory=list, description="Descriptions of contradictory clauses if status == CONFLICTING")
+    generation_model: Optional[str] = Field(default=None, description="Model used for generation")
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+

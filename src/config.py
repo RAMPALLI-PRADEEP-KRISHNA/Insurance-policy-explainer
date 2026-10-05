@@ -53,9 +53,13 @@ class AppConfig:
     MAX_KEYWORD_BOOST: float = float(os.getenv("MAX_KEYWORD_BOOST", "0.15"))
 
 
-    # LLM Settings (Phase 4 preview - no client is initialized here)
+    # LLM Settings (Phase 4)
     GEMINI_API_KEY: Optional[str] = os.getenv("GEMINI_API_KEY", None)
     GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    GEMINI_TIMEOUT_SECONDS: int = int(os.getenv("GEMINI_TIMEOUT_SECONDS", "30"))
+    GEMINI_TEMPERATURE: float = float(os.getenv("GEMINI_TEMPERATURE", "0.0"))
+    TAMIL_GENERATION_MODE: str = os.getenv("TAMIL_GENERATION_MODE", "translation")
+
 
     # Logging
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO").upper()
