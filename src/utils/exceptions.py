@@ -50,3 +50,28 @@ class TesseractNotFoundError(OCRError):
             "Or set the TESSERACT_CMD environment variable to the tesseract.exe path."
         )
         super().__init__(f"{message}{install_hint}")
+
+
+class EmbeddingError(InsuranceExplainerError):
+    """Raised when text embedding fails."""
+    pass
+
+
+class IndexStoreError(InsuranceExplainerError):
+    """Base exception for FAISS vector index store operations."""
+    pass
+
+
+class IndexNotFoundError(IndexStoreError):
+    """Raised when an index for a specific document ID does not exist."""
+    pass
+
+
+class StaleIndexError(IndexStoreError):
+    """Raised when an existing index is stale (mismatched file hash, chunk count, model, or schema)."""
+    pass
+
+
+class CorruptedIndexError(IndexStoreError):
+    """Raised when an index file or chunk metadata cannot be read or deserialized."""
+    pass

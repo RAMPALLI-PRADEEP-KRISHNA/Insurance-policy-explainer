@@ -30,9 +30,16 @@ class AppConfig:
     OCR_DPI: int = int(os.getenv("OCR_DPI", "300"))
     TESSERACT_CMD: Optional[str] = os.getenv("TESSERACT_CMD", None)
 
-    # Chunking Configuration (Phase 2 preview)
+    # Chunking Configuration
     MAX_CHUNK_CHARS: int = int(os.getenv("MAX_CHUNK_CHARS", "800"))
     OVERLAP_CHARS: int = int(os.getenv("OVERLAP_CHARS", "160"))
+
+    # Embedding & FAISS Index Configuration (Phase 2B)
+    EMBEDDING_MODEL_NAME: str = os.getenv("EMBEDDING_MODEL_NAME", "paraphrase-multilingual-mpnet-base-v2")
+    EMBEDDING_DIM: int = int(os.getenv("EMBEDDING_DIM", "768"))
+    EMBEDDING_BATCH_SIZE: int = int(os.getenv("EMBEDDING_BATCH_SIZE", "32"))
+    EMBEDDING_DEVICE: str = os.getenv("EMBEDDING_DEVICE", "cpu")
+    INDEX_SCHEMA_VERSION: str = "1"
 
     # Retrieval Thresholds (Phase 3 preview)
     EVIDENCE_HIGH_THRESHOLD: float = float(os.getenv("EVIDENCE_HIGH_THRESHOLD", "0.65"))

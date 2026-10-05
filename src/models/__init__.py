@@ -9,6 +9,7 @@ from src.models.data_models import (
     Page,
     Chunk,
     Document,
+    IndexMetadata,
 )
 
 __all__ = [
@@ -20,4 +21,5 @@ __all__ = [
     "Page",
     "Chunk",
     "Document",
+    "IndexMetadata",
 ]

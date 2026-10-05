@@ -139,3 +139,18 @@ class Document(BaseModel):
         if self.status == DocumentStatus.FAILED and not self.error_message:
             self.error_message = "Ingestion failed with unspecified error."
         return self
+
+
+class IndexMetadata(BaseModel):
+    """Metadata describing a persistent, document-isolated FAISS vector index."""
+    document_id: str = Field(..., description="Foreign key to Document.doc_id")
+    filename: str = Field(..., description="Source policy filename")
+    file_hash: str = Field(..., description="SHA-256 hash of the policy document")
+    chunk_count: int = Field(..., ge=0, description="Total vectors indexed")
+    embedding_model: str = Field(..., description="Model identifier used for embedding")
+    embedding_dimension: int = Field(..., ge=1, description="Vector dimension (e.g. 768)")
+    normalized: bool = Field(default=True, description="Whether vectors are L2-normalized for cosine similarity")
+    index_type: str = Field(default="IndexFlatIP", description="FAISS index class identifier")
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    index_schema_version: str = Field(default="1", description="Index schema version")
+

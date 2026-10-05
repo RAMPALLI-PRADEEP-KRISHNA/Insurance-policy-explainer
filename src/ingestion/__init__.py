@@ -6,6 +6,8 @@ from src.ingestion.quality_checker import QualityChecker, quality_checker
 from src.ingestion.table_extractor import TableExtractor, table_extractor
 from src.ingestion.header_footer import HeaderFooterDetector, header_footer_detector
 from src.ingestion.chunker import Chunker, chunk_document
+from src.ingestion.embedder import Embedder, embedder
+from src.ingestion.index_store import IndexStore, index_store, build_index
 
 __all__ = [
     "PDFExtractor",
@@ -20,4 +22,9 @@ __all__ = [
     "header_footer_detector",
     "Chunker",
     "chunk_document",
+    "Embedder",
+    "embedder",
+    "IndexStore",
+    "index_store",
+    "build_index",
 ]
