@@ -41,9 +41,17 @@ class AppConfig:
     EMBEDDING_DEVICE: str = os.getenv("EMBEDDING_DEVICE", "cpu")
     INDEX_SCHEMA_VERSION: str = "1"
 
-    # Retrieval Thresholds (Phase 3 preview)
+    # Retrieval Configuration (Phase 3)
+    RETRIEVAL_CANDIDATE_K: int = int(os.getenv("RETRIEVAL_CANDIDATE_K", "10"))
+    RETRIEVAL_FINAL_K: int = int(os.getenv("RETRIEVAL_FINAL_K", "5"))
+    MIN_EVIDENCE_RESULTS: int = int(os.getenv("MIN_EVIDENCE_RESULTS", "2"))
     EVIDENCE_HIGH_THRESHOLD: float = float(os.getenv("EVIDENCE_HIGH_THRESHOLD", "0.65"))
     EVIDENCE_LOW_THRESHOLD: float = float(os.getenv("EVIDENCE_LOW_THRESHOLD", "0.40"))
+    KEYWORD_BOOST_NUMERIC: float = float(os.getenv("KEYWORD_BOOST_NUMERIC", "0.10"))
+    KEYWORD_BOOST_RISK: float = float(os.getenv("KEYWORD_BOOST_RISK", "0.10"))
+    KEYWORD_BOOST_TABLE: float = float(os.getenv("KEYWORD_BOOST_TABLE", "0.05"))
+    MAX_KEYWORD_BOOST: float = float(os.getenv("MAX_KEYWORD_BOOST", "0.15"))
+
 
     # LLM Settings (Phase 4 preview - no client is initialized here)
     GEMINI_API_KEY: Optional[str] = os.getenv("GEMINI_API_KEY", None)

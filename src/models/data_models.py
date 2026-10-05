@@ -154,3 +154,77 @@ class IndexMetadata(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     index_schema_version: str = Field(default="1", description="Index schema version")
 
+
+class EvidenceStatus(str, Enum):
+    """The four-state validation status for retrieved evidence."""
+    SUFFICIENT = "SUFFICIENT"
+    MARGINAL = "MARGINAL"
+    INSUFFICIENT = "INSUFFICIENT"
+    CONFLICTING = "CONFLICTING"
+
+
+class RetrievalResult(BaseModel):
+    """Represents a scored, ranked candidate chunk retrieved from a document index."""
+    chunk: Chunk = Field(..., description="Underlying retrieved Chunk object")
+    vector_score: float = Field(..., description="Raw FAISS cosine similarity score")
+    keyword_boost: float = Field(default=0.0, description="Additive keyword/numeric signal boost")
+    final_score: float = Field(..., description="Combined retrieval score (vector_score + keyword_boost)")
+    rank: int = Field(default=1, ge=1, description="1-based ordinal rank after sorting")
+    passed_threshold: bool = Field(default=True, description="Whether this result meets or exceeds the minimum threshold")
+
+    # Authoritative properties directly delegated to Chunk to guarantee metadata provenance
+    @property
+    def doc_id(self) -> str:
+        return self.chunk.doc_id
+
+    @property
+    def chunk_id(self) -> str:
+        return self.chunk.chunk_id
+
+    @property
+    def filename(self) -> str:
+        return self.chunk.filename
+
+    @property
+    def page_number(self) -> int:
+        return self.chunk.page_number
+
+    @property
+    def page_numbers(self) -> List[int]:
+        return self.chunk.page_numbers
+
+    @property
+    def section(self) -> Optional[str]:
+        return self.chunk.section
+
+    @property
+    def heading(self) -> Optional[str]:
+        return self.chunk.subsection or self.chunk.section
+
+    @property
+    def chunk_type(self) -> ChunkType:
+        return self.chunk.chunk_type
+
+    @property
+    def text(self) -> str:
+        return self.chunk.text
+
+    @property
+    def raw_similarity(self) -> float:
+        return self.vector_score
+
+
+class Evidence(BaseModel):
+    """Structured evidence evaluation output for answer generation."""
+    query: str = Field(..., min_length=1, description="Original user query")
+    doc_id: str = Field(..., description="Foreign key to Document.doc_id")
+    status: EvidenceStatus = Field(..., description="4-state evidence validation status")
+    results: List[RetrievalResult] = Field(default_factory=list, description="Ranked retrieval results that passed threshold")
+    supporting_chunk_ids: List[str] = Field(default_factory=list, description="IDs of chunks directly supporting the status")
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0, description="Confidence score in the evidence sufficiency (0.0 to 1.0)")
+    validator_notes: Optional[str] = Field(default=None, description="Human-readable explanation of the validation decision")
+    detected_conflicts: List[str] = Field(default_factory=list, description="Descriptions of contradictory clauses if status == CONFLICTING")
+    evidence_summary: Optional[str] = Field(default=None, description="Concise synthesis of evidence text for answer generation")
+    total_candidates: int = Field(default=0, ge=0, description="Total candidates evaluated before thresholding")
+
+

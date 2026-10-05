@@ -10,6 +10,9 @@ from src.models.data_models import (
     Chunk,
     Document,
     IndexMetadata,
+    EvidenceStatus,
+    RetrievalResult,
+    Evidence,
 )
 
 __all__ = [
@@ -22,4 +25,7 @@ __all__ = [
     "Chunk",
     "Document",
     "IndexMetadata",
+    "EvidenceStatus",
+    "RetrievalResult",
+    "Evidence",
 ]

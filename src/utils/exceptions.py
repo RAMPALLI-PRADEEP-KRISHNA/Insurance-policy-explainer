@@ -75,3 +75,14 @@ class StaleIndexError(IndexStoreError):
 class CorruptedIndexError(IndexStoreError):
     """Raised when an index file or chunk metadata cannot be read or deserialized."""
     pass
+
+
+class RetrievalError(InsuranceExplainerError):
+    """Raised when query retrieval fails or encounters invalid query/parameters."""
+    pass
+
+
+class EvidenceValidationError(InsuranceExplainerError):
+    """Raised when evidence evaluation fails."""
+    pass
+

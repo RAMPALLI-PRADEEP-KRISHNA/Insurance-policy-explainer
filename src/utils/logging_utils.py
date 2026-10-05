@@ -41,3 +41,5 @@ def setup_logger(name: str = "insurance_explainer") -> logging.Logger:
 
 
 logger = setup_logger()
+get_logger = setup_logger
+
