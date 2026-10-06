@@ -104,42 +104,36 @@ Adversarial evaluation surfaced five genuine defects in the codebase that were i
 
 ---
 
-## 6. Conclusion & Demonstration Readiness
+## 6. Final Validation Summary
 
-The Insurance Policy Explainer demonstrates rigorous grounding, strict uncertainty preservation, and document isolation:
-- Total Automated Tests: **149 tests** (148 passed, 1 skipped)
-- Code Coverage: **82%** across all backend modules
-- Zero cross-document data leakage
-- Zero hallucinated citations
+### A. Deterministic / Automated Validation
+- **Unit & Integration Tests:** PASSED
+- **Deterministic Evaluation Benchmark:** PASSED
+- **Retrieval & Evidence Validation Tests:** PASSED
+- **Citation Assembly Tests:** PASSED
+- **Comparison & Red-Flag Scanner Tests:** PASSED
+- **OCR Fixture Tests:** PASSED
+- **Programmatic Streamlit Smoke Tests:** PASSED
+- **Overall Results:** 148 passed, 1 skipped, 0 failed
+- **Coverage:** 82% code coverage across backend components
 
-## Final Live Validation
+### B. Live External Validation
+**Gemini live validation: BLOCKED**
+- **Reason:** `GEMINI_API_KEY` is not configured in the current environment.
+- Therefore:
+  - no valid Gemini API request was completed;
+  - no live Gemini answer quality claim is made;
+  - no live Gemini Tamil-generation claim is made;
+  - no live Gemini citation-generation claim is made.
 
-### Gemini Status
-**LIVE GEMINI VALIDATION: BLOCKED**
-The `GEMINI_API_KEY` was missing from the environment. As a result, genuine live LLM integration could not be tested over the network.
+### C. Real Browser Validation
+**Real browser validation: NOT PERFORMED**
+- **Reason:** The environment does not provide a traditional GUI browser suitable for genuine manual interaction.
+- The available automated UI tests passed, but they must not be represented as human browser testing.
 
-### Live Gemini Functional Tests
-- **Status:** SKIPPED
-- **Reason:** Missing API credentials. Tests were safely skipped to prevent fabricated results.
+## 7. Conclusion & Demonstration Readiness
 
-### Browser Tests (Simulated UI Smoke Tests)
-- **Status:** PASSED (6/6 scenarios)
-- **Methodology:** Since the evaluation environment lacks a traditional GUI browser, Streamlit application health and user flows were validated via programmatic UI simulation (`tests/integration/test_ui_manual_smoke.py`). 
-- **Scenarios verified:**
-  1. Synthetic Policy Upload
-  2. QA: Waiting Period for Pre-existing Conditions
-  3. QA: Room Rent Limit
-  4. QA: Maternity Expenses
-  5. QA: Tamil Queries
-  6. Second Policy Upload & Isolation Verification
+The application has passed deterministic backend, integration, evaluation, and programmatic UI validation. The live Gemini generation path and real browser interaction remain unverified in the current environment because a valid GEMINI_API_KEY and traditional GUI browser were unavailable.
 
-### Regression
-- **Status:** PASSED
-- **Results:** 148 passed, 1 skipped, 0 failed.
-- **Coverage:** 82% code coverage across backend components. 
-
-### Defects
-No defects were introduced or detected during this final validation phase.
-
-### Final Status
-**READY FOR DEMO / PRODUCTION DEPLOYMENT** (Subject to provisioning of valid API keys in the target environment).
+**Final Status:**
+**TECHNICALLY VALIDATED — LIVE GEMINI AND REAL BROWSER VALIDATION PENDING**
