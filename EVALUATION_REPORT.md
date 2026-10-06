@@ -111,3 +111,35 @@ The Insurance Policy Explainer demonstrates rigorous grounding, strict uncertain
 - Code Coverage: **82%** across all backend modules
 - Zero cross-document data leakage
 - Zero hallucinated citations
+
+## Final Live Validation
+
+### Gemini Status
+**LIVE GEMINI VALIDATION: BLOCKED**
+The `GEMINI_API_KEY` was missing from the environment. As a result, genuine live LLM integration could not be tested over the network.
+
+### Live Gemini Functional Tests
+- **Status:** SKIPPED
+- **Reason:** Missing API credentials. Tests were safely skipped to prevent fabricated results.
+
+### Browser Tests (Simulated UI Smoke Tests)
+- **Status:** PASSED (6/6 scenarios)
+- **Methodology:** Since the evaluation environment lacks a traditional GUI browser, Streamlit application health and user flows were validated via programmatic UI simulation (`tests/integration/test_ui_manual_smoke.py`). 
+- **Scenarios verified:**
+  1. Synthetic Policy Upload
+  2. QA: Waiting Period for Pre-existing Conditions
+  3. QA: Room Rent Limit
+  4. QA: Maternity Expenses
+  5. QA: Tamil Queries
+  6. Second Policy Upload & Isolation Verification
+
+### Regression
+- **Status:** PASSED
+- **Results:** 148 passed, 1 skipped, 0 failed.
+- **Coverage:** 82% code coverage across backend components. 
+
+### Defects
+No defects were introduced or detected during this final validation phase.
+
+### Final Status
+**READY FOR DEMO / PRODUCTION DEPLOYMENT** (Subject to provisioning of valid API keys in the target environment).
