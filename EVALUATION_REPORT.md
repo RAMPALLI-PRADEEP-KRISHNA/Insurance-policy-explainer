@@ -106,33 +106,41 @@ Adversarial evaluation surfaced five genuine defects in the codebase that were i
 
 ## 6. Final Validation Summary
 
-### A. Deterministic / Automated Validation
-- **Unit & Integration Tests:** PASSED
-- **Deterministic Evaluation Benchmark:** PASSED
-- **Retrieval & Evidence Validation Tests:** PASSED
-- **Citation Assembly Tests:** PASSED
-- **Comparison & Red-Flag Scanner Tests:** PASSED
-- **OCR Fixture Tests:** PASSED
-- **Programmatic Streamlit Smoke Tests:** PASSED
-- **Overall Results:** 148 passed, 1 skipped, 0 failed
-- **Coverage:** 82% code coverage across backend components
+### 1. Deterministic Evaluation
+The deterministic benchmark passed with the previously established results (100% metrics across retrieval recall, evidence sufficiency, citation correctness, numeric accuracy, abstention, Tamil queries, and two-policy comparison).
 
-### B. Live External Validation
-**Gemini live validation: BLOCKED**
-- **Reason:** While the `GEMINI_API_KEY` was successfully configured, the actual API request failed with a `503 UNAVAILABLE` error ("This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.") preventing live validation.
-- Therefore:
-  - no live Gemini answer quality claim is made;
-  - no live Gemini Tamil-generation claim is made;
-  - no live Gemini citation-generation claim is made.
+### 2. Automated Regression
+- 149 total
+- 148 passed
+- 0 failed
+- 1 skipped
+- 82% coverage
+*Note: The 1 skipped test is the live Gemini smoke test, which correctly skips when the live dependency is excluded.*
 
-### C. Real Browser Validation
-**Real browser validation: NOT PERFORMED**
-- **Reason:** The environment does not provide a traditional GUI browser suitable for genuine manual interaction.
-- The available automated UI tests passed, but they must not be represented as human browser testing.
+### 3. Live Gemini
+**BLOCKED — EXTERNAL GOOGLE API 503 UNAVAILABLE**
+- API key is configured
+- Model lookup succeeds for gemini-3.8-flash
+- Actual generation request reaches Google's API
+- Generation returns 503 UNAVAILABLE
+- Therefore live Gemini answer quality cannot yet be certified.
 
-## 7. Conclusion & Demonstration Readiness
+### 4. Browser
+**NOT PERFORMED**
+The current Antigravity environment does not provide GUI browser interaction.
 
-The application has passed deterministic backend, integration, evaluation, and programmatic UI validation. The live Gemini generation path was attempted but remains unverified because the Gemini API service was temporarily unavailable (503 error), and real browser interaction remains unverified because a traditional GUI browser was unavailable.
+---
+
+## 7. Known Validation Limitations
+
+1. Live Gemini generation could not be completed because Google's API returned HTTP 503 UNAVAILABLE during validation.
+2. Real browser interaction was not performed because the validation environment has no GUI browser capability.
+3. Deterministic application tests remain green independently of the external Gemini availability issue.
+4. The Gemini model configuration has been verified as available through model lookup, but actual generation remains externally blocked.
+
+---
+
+## 8. Conclusion
 
 **Final Status:**
-**TECHNICALLY VALIDATED — LIVE GEMINI AND REAL BROWSER VALIDATION PENDING**
+**TECHNICALLY VALIDATED — LIVE GEMINI BLOCKED BY EXTERNAL 503 AND REAL BROWSER VALIDATION PENDING**
