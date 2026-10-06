@@ -44,6 +44,7 @@ from src.utils.exceptions import (
     MissingAPIKeyError,
     ModelUnavailableError,
     GenerationTimeoutError,
+    GeminiServiceUnavailableError,
     IndexNotFoundError,
 )
 from src.utils.logging_utils import get_logger
@@ -558,6 +559,14 @@ def main() -> None:
                         st.error(f"Configured Gemini model is unavailable: {str(e)}")
                     except GenerationTimeoutError:
                         st.error("The answer generation request timed out. Please try asking again.")
+                    except GeminiServiceUnavailableError:
+                        st.warning(
+                            "⏳ **Gemini is temporarily unavailable.**\n\n"
+                            "The AI model is currently experiencing high demand. "
+                            "Your policy was processed and the relevant clauses were retrieved successfully, "
+                            "but an AI-generated answer could not be produced right now.\n\n"
+                            "**Please try again in a moment.**"
+                        )
                     except IndexNotFoundError:
                         st.error("The policy index could not be located. Please re-upload the document.")
                     except InsuranceExplainerError as e:

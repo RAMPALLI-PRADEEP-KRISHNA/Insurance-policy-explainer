@@ -112,3 +112,8 @@ class MalformedOutputError(GenerationError):
     pass
 
 
+class GeminiServiceUnavailableError(GenerationError):
+    """Raised when Gemini API returns 503 UNAVAILABLE (transient server overload)."""
+    pass
+
+

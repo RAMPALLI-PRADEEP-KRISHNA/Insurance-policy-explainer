@@ -124,6 +124,7 @@ The deterministic benchmark passed with the previously established results (100%
 - Actual generation request reaches Google's API
 - Generation returns 503 UNAVAILABLE
 - Therefore live Gemini answer quality cannot yet be certified.
+- **Hardening Update**: The application now intercepts transient 503s with a bounded retry policy (max 2 retries, exponential backoff). If unavailability persists, it safely aborts and surfaces a clean, user-friendly status message rather than a raw exception traceback.
 
 ### 4. Browser
 **NOT PERFORMED**
