@@ -17,6 +17,15 @@ from src.models.data_models import (
     DocumentStatus,
     EvidenceStatus,
     GroundedAnswer,
+    RedFlag,
+    RedFlagReport,
+    RiskCategory,
+    RiskSeverity,
+)
+from src.risk_scanner.red_flag_scanner import (
+    red_flag_scanner,
+    RedFlagScanner,
+    scan_policy,
 )
 from src.retrieval.evidence_validator import evidence_validator, EvidenceValidator
 from src.retrieval.retriever import retriever, Retriever
@@ -124,9 +133,88 @@ def answer_policy_question(
     return g.generate_answer(query=query, evidence=evidence, language=language)
 
 
+def scan_policy_red_flags(
+    document: Document,
+    chunks: Optional[List[Chunk]] = None,
+    scanner_instance: Optional[RedFlagScanner] = None,
+) -> RedFlagReport:
+    """
+    Execute evidence-grounded red-flag scan on an insurance policy.
+    Identifies high-impact restrictions (waiting periods, exclusions, co-pay, room rent limits).
+
+    Args:
+        document: Ingested policy Document model.
+        chunks: Optional list of Chunks (resolved automatically if None).
+        scanner_instance: Optional RedFlagScanner instance.
+
+    Returns:
+        RedFlagReport with detected clauses, review priorities, and page citations.
+    """
+    scanner = scanner_instance or red_flag_scanner
+    return scanner.scan(document=document, chunks=chunks)
+
+
 # =====================================================================
 # STREAMLIT UI COMPONENTS
 # =====================================================================
+
+def render_red_flags(report: RedFlagReport) -> None:
+    """Render categorized red flags with review priority badges and citations."""
+    if report.total_flags == 0:
+        st.info("No significant restrictive clauses or red flags were identified in this policy.")
+        return
+
+    # Metrics summary row
+    high_count = sum(1 for f in report.findings if f.severity == RiskSeverity.HIGH)
+    med_count = sum(1 for f in report.findings if f.severity == RiskSeverity.MEDIUM)
+    low_count = sum(1 for f in report.findings if f.severity == RiskSeverity.LOW)
+
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Total Flags Found", report.total_flags)
+    c2.metric("High Review Priority", high_count)
+    c3.metric("Medium Review Priority", med_count)
+    c4.metric("Low Review Priority", low_count)
+
+    st.markdown("---")
+
+    # Filter controls
+    col_filter, col_info = st.columns([1, 2])
+    with col_filter:
+        sev_filter = st.selectbox(
+            "Filter by review priority:",
+            ["All Severities", "HIGH", "MEDIUM", "LOW"],
+            index=0,
+        )
+
+    filtered_findings = report.findings
+    if sev_filter != "All Severities":
+        filtered_findings = [f for f in filtered_findings if f.severity.value == sev_filter]
+
+    if not filtered_findings:
+        st.write(f"No flags found with severity '{sev_filter}'.")
+    else:
+        for idx, flag in enumerate(filtered_findings, start=1):
+            if flag.severity == RiskSeverity.HIGH:
+                sev_badge = "🔴 **HIGH REVIEW PRIORITY**"
+            elif flag.severity == RiskSeverity.MEDIUM:
+                sev_badge = "🟡 **MEDIUM REVIEW PRIORITY**"
+            else:
+                sev_badge = "🔵 **LOW REVIEW PRIORITY**"
+
+            cat_label = flag.category.value.replace("_", " ").title()
+
+            with st.container():
+                st.markdown(f"#### {idx}. {flag.title}")
+                st.markdown(f"{sev_badge} &nbsp;|&nbsp; **Category:** `{cat_label}` &nbsp;|&nbsp; **Page:** {flag.page_number}")
+                st.write(flag.description)
+
+                with st.expander(f"📌 View Source Excerpt & Citation (Page {flag.page_number})"):
+                    st.caption(f"**Section:** {flag.section or 'N/A'} | **Clause:** {flag.heading or 'N/A'}")
+                    st.info(f'"{flag.source_snippet}"')
+                st.markdown("---")
+
+    st.caption(f"⚠️ **Disclaimer:** {report.disclaimer}")
+
 
 def render_citations(citations: list) -> None:
     """Render authoritative page-level citations in clean expandable UI."""
@@ -190,6 +278,8 @@ def main() -> None:
         st.session_state.chat_history = []
     if "uploaded_filename" not in st.session_state:
         st.session_state.uploaded_filename = None
+    if "red_flag_report" not in st.session_state:
+        st.session_state.red_flag_report = None
 
     # Sidebar: Policy Upload & Configuration
     with st.sidebar:
@@ -214,6 +304,7 @@ def main() -> None:
                     st.session_state.active_chunks = chunks
                     st.session_state.uploaded_filename = uploaded_file.name
                     st.session_state.chat_history = []  # Reset chat history for new policy
+                    st.session_state.red_flag_report = None  # Reset report for new policy
 
                     st.toast("Policy processed and indexed successfully!", icon="✅")
                 except Exception as e:
@@ -259,13 +350,14 @@ def main() -> None:
                 st.session_state.active_chunks = []
                 st.session_state.chat_history = []
                 st.session_state.uploaded_filename = None
+                st.session_state.red_flag_report = None
                 st.rerun()
         else:
             st.info("No policy active. Please upload a PDF above.")
 
     # Main Area: Chat & Question Interface
     st.header("📋 Insurance Policy Explainer")
-    st.caption("Ask questions in English or Tamil. All answers are strictly grounded in your policy with page citations.")
+    st.caption("Ask questions in English or Tamil, or scan for important policy restrictions and exclusions.")
 
     if active_doc is None:
         st.info("👈 Please upload an insurance policy PDF in the sidebar to get started.")
@@ -276,7 +368,7 @@ def main() -> None:
             - **Zero Hallucination:** Never guesses or assumes unwritten terms.
             - **Page Citations:** Every claim links directly to the source page and clause.
             - **Bilingual:** Ask and receive answers in either English or Tamil.
-            - **Exclusions & Limits:** Clarifies waiting periods, co-pay percentages, and sub-limits verbatim.
+            - **Red-Flag Scanner:** Identifies waiting periods, exclusions, co-payments, room-rent limits, and sub-limits.
             """
         )
         return
@@ -285,67 +377,92 @@ def main() -> None:
     if active_doc.quality in {DocumentQuality.FAILED, DocumentQuality.POOR}:
         st.error(
             "⚠️ The uploaded document text could not be extracted with sufficient reliability. "
-            "Querying is disabled to prevent inaccurate or misleading insurance information."
+            "Analysis is disabled to prevent inaccurate or misleading insurance information."
         )
         return
 
-    # Render Chat History
-    for chat_item in st.session_state.chat_history:
-        with st.chat_message("user"):
-            st.write(chat_item["query"])
+    # Tabs for Question Answering and Red-Flag Scanner
+    tab_chat, tab_scanner = st.tabs(["💬 Ask Questions", "🚩 Policy Red-Flag Scanner"])
 
-        with st.chat_message("assistant"):
-            grounded_ans: GroundedAnswer = chat_item["answer"]
-            render_evidence_status_badge(grounded_ans.evidence_status, grounded_ans.confidence)
-            st.markdown(grounded_ans.answer)
-            render_citations(grounded_ans.citations)
+    with tab_chat:
+        # Render Chat History
+        for chat_item in st.session_state.chat_history:
+            with st.chat_message("user"):
+                st.write(chat_item["query"])
 
-    # Chat Input Box
-    query = st.chat_input("Ask a question about this policy (e.g., 'What is the waiting period for pre-existing diseases?')...")
+            with st.chat_message("assistant"):
+                grounded_ans: GroundedAnswer = chat_item["answer"]
+                render_evidence_status_badge(grounded_ans.evidence_status, grounded_ans.confidence)
+                st.markdown(grounded_ans.answer)
+                render_citations(grounded_ans.citations)
 
-    if query:
-        # Display user message immediately
-        with st.chat_message("user"):
-            st.write(query)
+        # Chat Input Box
+        query = st.chat_input("Ask a question about this policy (e.g., 'What is the waiting period for pre-existing diseases?')...")
 
-        # Process question through RAG pipeline
-        with st.chat_message("assistant"):
-            with st.spinner("Searching policy clauses, validating evidence, and generating grounded answer..."):
-                try:
-                    grounded_ans = answer_policy_question(
-                        doc_id=active_doc.doc_id,
-                        query=query,
-                        language=selected_language,
+        if query:
+            # Display user message immediately
+            with st.chat_message("user"):
+                st.write(query)
+
+            # Process question through RAG pipeline
+            with st.chat_message("assistant"):
+                with st.spinner("Searching policy clauses, validating evidence, and generating grounded answer..."):
+                    try:
+                        grounded_ans = answer_policy_question(
+                            doc_id=active_doc.doc_id,
+                            query=query,
+                            language=selected_language,
+                        )
+
+                        render_evidence_status_badge(grounded_ans.evidence_status, grounded_ans.confidence)
+                        st.markdown(grounded_ans.answer)
+                        render_citations(grounded_ans.citations)
+
+                        # Append to session state chat history
+                        st.session_state.chat_history.append({
+                            "query": query,
+                            "answer": grounded_ans,
+                            "language": selected_language,
+                        })
+
+                    except MissingAPIKeyError:
+                        st.warning(
+                            "⚠️ **Gemini API key is not configured.**\n\n"
+                            "To generate AI answers, please configure `GEMINI_API_KEY` in your `.env` file. "
+                            "Retrieval and evidence validation are fully operational."
+                        )
+                    except ModelUnavailableError as e:
+                        st.error(f"Configured Gemini model is unavailable: {str(e)}")
+                    except GenerationTimeoutError:
+                        st.error("The answer generation request timed out. Please try asking again.")
+                    except IndexNotFoundError:
+                        st.error("The policy index could not be located. Please re-upload the document.")
+                    except InsuranceExplainerError as e:
+                        st.error(f"Application error: {str(e)}")
+                    except Exception as e:
+                        logger.exception("Unexpected error in chat answering: %s", e)
+                        st.error("An unexpected error occurred while answering your question. Please try again.")
+
+    with tab_scanner:
+        st.subheader("🚩 Evidence-Grounded Red-Flag Scanner")
+        st.caption("Identifies policy exclusions, waiting periods, room-rent limits, and co-payment obligations.")
+
+        col_btn, col_help = st.columns([1, 2])
+        with col_btn:
+            scan_clicked = st.button("🔍 Scan Policy for Red Flags", type="primary")
+
+        if scan_clicked or st.session_state.red_flag_report is not None:
+            if scan_clicked or st.session_state.red_flag_report is None:
+                with st.spinner("Scanning policy clauses and analyzing restrictive terms..."):
+                    report = scan_policy_red_flags(
+                        document=active_doc,
+                        chunks=st.session_state.active_chunks,
                     )
+                    st.session_state.red_flag_report = report
 
-                    render_evidence_status_badge(grounded_ans.evidence_status, grounded_ans.confidence)
-                    st.markdown(grounded_ans.answer)
-                    render_citations(grounded_ans.citations)
-
-                    # Append to session state chat history
-                    st.session_state.chat_history.append({
-                        "query": query,
-                        "answer": grounded_ans,
-                        "language": selected_language,
-                    })
-
-                except MissingAPIKeyError:
-                    st.warning(
-                        "⚠️ **Gemini API key is not configured.**\n\n"
-                        "To generate AI answers, please configure `GEMINI_API_KEY` in your `.env` file. "
-                        "Retrieval and evidence validation are fully operational."
-                    )
-                except ModelUnavailableError as e:
-                    st.error(f"Configured Gemini model is unavailable: {str(e)}")
-                except GenerationTimeoutError:
-                    st.error("The answer generation request timed out. Please try asking again.")
-                except IndexNotFoundError:
-                    st.error("The policy index could not be located. Please re-upload the document.")
-                except InsuranceExplainerError as e:
-                    st.error(f"Application error: {str(e)}")
-                except Exception as e:
-                    logger.exception("Unexpected error in chat answering: %s", e)
-                    st.error("An unexpected error occurred while answering your question. Please try again.")
+            render_red_flags(st.session_state.red_flag_report)
+        else:
+            st.info("Click '🔍 Scan Policy for Red Flags' to analyze this policy for important clauses and restrictions.")
 
 
 if __name__ == "__main__":

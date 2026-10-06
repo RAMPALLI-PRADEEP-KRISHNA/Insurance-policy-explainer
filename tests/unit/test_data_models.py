@@ -120,3 +120,60 @@ def test_table_data_model():
     assert t.page_number == 2
     assert t.row_count == 2
     assert len(t.headers) == 2
+
+
+def test_risk_scanner_data_models():
+    """Verify RiskCategory, RiskSeverity, RedFlag, and RedFlagReport data models."""
+    from src.models.data_models import (
+        RiskCategory,
+        RiskSeverity,
+        RedFlag,
+        RiskFinding,
+        RedFlagReport,
+        Citation,
+    )
+
+    cit = Citation(
+        document_id="doc-1",
+        chunk_id="chunk-1",
+        filename="test.pdf",
+        page_number=1,
+        page_numbers=[1],
+        source_snippet="Sample snippet",
+    )
+
+    flag = RedFlag(
+        category=RiskCategory.WAITING_PERIOD,
+        title="36-Month PED Waiting Period",
+        description="Pre-existing diseases require 36 months of waiting.",
+        severity=RiskSeverity.HIGH,
+        document_id="doc-1",
+        chunk_id="chunk-1",
+        page_number=1,
+        source_snippet="Pre-existing diseases waiting period: 36 months.",
+        citations=[cit],
+    )
+    assert flag.severity == RiskSeverity.HIGH
+    assert flag.page_number == 1
+
+    report = RedFlagReport(
+        document_id="doc-1",
+        filename="test.pdf",
+        total_flags=1,
+        findings=[flag],
+        categories_found=[RiskCategory.WAITING_PERIOD],
+    )
+    assert report.total_flags == 1
+    assert "disclaimer" in report.model_dump()
+    assert len(report.disclaimer) > 10
+
+    finding = RiskFinding(
+        doc_id="doc-1",
+        category=RiskCategory.WAITING_PERIOD,
+        found=True,
+        summary="36-Month PED Waiting Period",
+        citations=[cit],
+        severity=RiskSeverity.HIGH,
+    )
+    assert finding.found is True
+    assert finding.severity == RiskSeverity.HIGH

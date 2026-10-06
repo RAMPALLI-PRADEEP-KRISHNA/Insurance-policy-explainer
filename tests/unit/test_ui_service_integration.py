@@ -9,6 +9,8 @@ from src.app import (
     answer_policy_question,
     render_citations,
     render_evidence_status_badge,
+    scan_policy_red_flags,
+    render_red_flags,
 )
 from src.ingestion.embedder import embedder
 from src.ingestion.index_store import IndexStore
@@ -257,3 +259,16 @@ def test_document_isolation_switching_policies(tmp_path, sample_pdf_bytes, make_
     for r in res_b:
         assert r.doc_id == doc_b.doc_id
         assert "health" not in r.filename.lower()
+
+
+def test_scan_policy_red_flags_ui_service(sample_pdf_bytes, tmp_path):
+    """Verify scan_policy_red_flags service function operates seamlessly on ingested documents."""
+    custom_store = IndexStore(indexes_dir=tmp_path / "ui_indexes", embedder_instance=embedder)
+    doc, chunks = process_uploaded_policy(sample_pdf_bytes, "health_policy.pdf", indexes_store=custom_store)
+
+    report = scan_policy_red_flags(doc, chunks)
+    assert report.document_id == doc.doc_id
+    assert report.total_flags >= 6
+    assert len(report.findings) >= 6
+    assert any(f.category.value == "ROOM_RENT_LIMIT" for f in report.findings)
+    assert any(f.category.value == "WAITING_PERIOD" for f in report.findings)

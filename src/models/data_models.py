@@ -3,6 +3,7 @@
 from datetime import datetime, timezone
 from enum import Enum
 from typing import List, Optional, Tuple
+import uuid
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 
@@ -252,6 +253,75 @@ class GroundedAnswer(BaseModel):
     detected_conflicts: List[str] = Field(default_factory=list, description="Descriptions of contradictory clauses if status == CONFLICTING")
     generation_model: Optional[str] = Field(default=None, description="Model used for generation")
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class RiskCategory(str, Enum):
+    """Categorization of restrictive or risk-associated insurance clauses."""
+    WAITING_PERIOD = "WAITING_PERIOD"
+    PERMANENT_EXCLUSION = "PERMANENT_EXCLUSION"
+    SPECIFIC_EXCLUSION = "SPECIFIC_EXCLUSION"
+    CO_PAYMENT = "CO_PAYMENT"
+    DEDUCTIBLE = "DEDUCTIBLE"
+    ROOM_RENT_LIMIT = "ROOM_RENT_LIMIT"
+    SUB_LIMIT = "SUB_LIMIT"
+    AGE_RESTRICTION = "AGE_RESTRICTION"
+    DISEASE_OR_PROCEDURE_LIMIT = "DISEASE_OR_PROCEDURE_LIMIT"
+    CLAIM_CONDITION = "CLAIM_CONDITION"
+    RESTORATION_RESTRICTION = "RESTORATION_RESTRICTION"
+    OTHER_MATERIAL_RESTRICTION = "OTHER_MATERIAL_RESTRICTION"
+    # Backward compatibility aliases
+    EXCLUSION = "EXCLUSION"
+    RESTRICTION = "RESTRICTION"
+
+
+class RiskSeverity(str, Enum):
+    """Review priority level indicating importance for policyholder attention."""
+    HIGH = "HIGH"
+    MEDIUM = "MEDIUM"
+    LOW = "LOW"
+
+
+class RedFlag(BaseModel):
+    """A granular restriction or risk clause detected in the policy."""
+    flag_id: str = Field(default_factory=lambda: str(uuid.uuid4()), description="Unique identifier")
+    category: RiskCategory = Field(..., description="Classification category")
+    title: str = Field(..., description="Short descriptive title of the restriction")
+    description: str = Field(..., description="Clear explanation of the restriction grounded in policy text")
+    severity: RiskSeverity = Field(..., description="Priority level for policyholder review")
+    document_id: str = Field(..., description="Foreign key to Document.doc_id")
+    chunk_id: str = Field(..., description="Foreign key to Chunk.chunk_id")
+    page_number: int = Field(..., ge=1, description="Primary 1-indexed page number")
+    page_numbers: List[int] = Field(default_factory=list, description="All pages spanned by source chunk")
+    section: Optional[str] = Field(default=None, description="Policy section name")
+    heading: Optional[str] = Field(default=None, description="Policy heading or clause name")
+    source_snippet: str = Field(..., description="Verbatim text snippet from policy chunk")
+    citations: List[Citation] = Field(default_factory=list, description="Authoritative citations")
+
+
+class RiskFinding(BaseModel):
+    """Aggregated risk finding per category as specified in DATA_MODEL.md."""
+    finding_id: str = Field(default_factory=lambda: str(uuid.uuid4()), description="Unique identifier")
+    doc_id: str = Field(..., description="Foreign key to Document.doc_id")
+    category: RiskCategory = Field(..., description="Risk category evaluated")
+    found: bool = Field(..., description="Whether clauses in this category were found")
+    summary: Optional[str] = Field(default=None, description="Brief description of finding")
+    source_chunks: List[Chunk] = Field(default_factory=list, description="Supporting evidence chunks")
+    citations: List[Citation] = Field(default_factory=list, description="Authoritative citations")
+    severity: Optional[RiskSeverity] = Field(default=None, description="Category severity assessment")
+
+
+class RedFlagReport(BaseModel):
+    """Comprehensive policy scan report aggregating detected red flags."""
+    document_id: str = Field(..., description="Foreign key to Document.doc_id")
+    filename: str = Field(..., description="Source policy filename")
+    total_flags: int = Field(default=0, ge=0, description="Total detected red flags")
+    findings: List[RedFlag] = Field(default_factory=list, description="List of granular detected red flags")
+    scanned_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="Scan timestamp")
+    categories_found: List[RiskCategory] = Field(default_factory=list, description="List of unique categories found")
+    disclaimer: str = Field(
+        default="This review highlights policy clauses requiring attention. It does not constitute legal or financial advice and does not imply the policy is deficient.",
+        description="Mandatory advisory disclaimer"
+    )
 
 
 

@@ -15,6 +15,11 @@ from src.models.data_models import (
     Evidence,
     Citation,
     GroundedAnswer,
+    RiskCategory,
+    RiskSeverity,
+    RedFlag,
+    RiskFinding,
+    RedFlagReport,
 )
 
 __all__ = [
@@ -32,4 +37,9 @@ __all__ = [
     "Evidence",
     "Citation",
     "GroundedAnswer",
+    "RiskCategory",
+    "RiskSeverity",
+    "RedFlag",
+    "RiskFinding",
+    "RedFlagReport",
 ]
