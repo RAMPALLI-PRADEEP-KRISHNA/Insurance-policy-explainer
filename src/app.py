@@ -1,0 +1,352 @@
+"""Streamlit web application for Insurance Policy Explainer."""
+
+import tempfile
+from pathlib import Path
+from typing import List, Optional, Tuple
+import streamlit as st
+
+from src.config import config
+from src.generation.answer_generator import answer_generator, AnswerGenerator
+from src.ingestion.chunker import chunk_document
+from src.ingestion.index_store import index_store, IndexStore
+from src.ingestion.pdf_extractor import process_pdf
+from src.models.data_models import (
+    Chunk,
+    Document,
+    DocumentQuality,
+    DocumentStatus,
+    EvidenceStatus,
+    GroundedAnswer,
+)
+from src.retrieval.evidence_validator import evidence_validator, EvidenceValidator
+from src.retrieval.retriever import retriever, Retriever
+from src.utils.exceptions import (
+    InsuranceExplainerError,
+    MissingAPIKeyError,
+    ModelUnavailableError,
+    GenerationTimeoutError,
+    IndexNotFoundError,
+)
+from src.utils.logging_utils import get_logger
+
+logger = get_logger(__name__)
+
+
+# =====================================================================
+# SERVICE FUNCTIONS (Decoupled for clean testability and UI reuse)
+# =====================================================================
+
+def process_uploaded_policy(
+    file_bytes: bytes,
+    filename: str,
+    indexes_store: Optional[IndexStore] = None,
+) -> Tuple[Document, List[Chunk]]:
+    """
+    Ingest, validate quality, chunk, and index an uploaded PDF policy.
+    Reuses existing index if the document hash is fresh.
+
+    Args:
+        file_bytes: Raw bytes of the uploaded PDF file.
+        filename: Name of the uploaded file.
+        indexes_store: Optional IndexStore instance (defaults to singleton).
+
+    Returns:
+        Tuple of (Document, List[Chunk])
+    """
+    store = indexes_store or index_store
+
+    # 1. Save temporarily to disk for PyMuPDF processing
+    temp_dir = Path(tempfile.gettempdir()) / "insurance_explainer_uploads"
+    temp_dir.mkdir(parents=True, exist_ok=True)
+    temp_path = temp_dir / filename
+    temp_path.write_bytes(file_bytes)
+
+    try:
+        # 2. Ingest & extract pages
+        document = process_pdf(temp_path, save_meta=True)
+
+        if document.status == DocumentStatus.FAILED or document.quality == DocumentQuality.FAILED:
+            return document, []
+
+        # 3. Chunk document
+        chunks = chunk_document(document)
+
+        # 4. Check freshness or build FAISS index
+        if not store.is_fresh(document.doc_id, document.file_hash):
+            store.build_index(document, chunks=chunks, force_rebuild=True)
+        else:
+            logger.info("Reusing existing fresh index for document '%s'", document.doc_id)
+
+        return document, chunks
+    finally:
+        # Clean up temporary upload file if desired
+        if temp_path.exists():
+            try:
+                temp_path.unlink()
+            except Exception:
+                pass
+
+
+def answer_policy_question(
+    doc_id: str,
+    query: str,
+    language: str = "en",
+    retriever_instance: Optional[Retriever] = None,
+    validator_instance: Optional[EvidenceValidator] = None,
+    generator_instance: Optional[AnswerGenerator] = None,
+) -> GroundedAnswer:
+    """
+    Execute complete grounded question answering pipeline:
+    Retriever -> EvidenceValidator -> AnswerGenerator -> GroundedAnswer
+
+    Args:
+        doc_id: Active policy document ID.
+        query: User question in English or Tamil.
+        language: 'en' for English, 'ta' for Tamil.
+        retriever_instance: Optional custom Retriever.
+        validator_instance: Optional custom EvidenceValidator.
+        generator_instance: Optional custom AnswerGenerator.
+
+    Returns:
+        GroundedAnswer containing answer text, citations, and evidence status.
+    """
+    r = retriever_instance or retriever
+    v = validator_instance or evidence_validator
+    g = generator_instance or answer_generator
+
+    # 1. Hybrid dense retrieval with numeric/keyword boosting
+    results = r.retrieve(doc_id=doc_id, query=query, top_k=config.RETRIEVAL_FINAL_K)
+
+    # 2. Four-state evidence validation
+    evidence = v.validate(query=query, results=results, doc_id=doc_id)
+
+    # 3. Grounded answer generation via Gemini (or controlled refusal on INSUFFICIENT)
+    return g.generate_answer(query=query, evidence=evidence, language=language)
+
+
+# =====================================================================
+# STREAMLIT UI COMPONENTS
+# =====================================================================
+
+def render_citations(citations: list) -> None:
+    """Render authoritative page-level citations in clean expandable UI."""
+    if not citations:
+        return
+
+    st.markdown("##### 📌 Authoritative Sources & Citations")
+    for idx, c in enumerate(citations, start=1):
+        pages_str = ", ".join(str(p) for p in c.page_numbers)
+        header_title = f"Page {pages_str} — {c.heading or c.section or 'Policy Clause'}"
+
+        with st.expander(header_title, expanded=(idx == 1)):
+            col1, col2 = st.columns([1, 2])
+            with col1:
+                st.caption(f"**Document:** {c.filename}")
+                st.caption(f"**Page(s):** {pages_str}")
+                if c.section:
+                    st.caption(f"**Section:** {c.section}")
+                if c.heading and c.heading != c.section:
+                    st.caption(f"**Clause:** {c.heading}")
+            with col2:
+                st.markdown("**Exact Policy Excerpt:**")
+                st.info(f'"{c.source_snippet}"')
+
+
+def render_evidence_status_badge(status: EvidenceStatus, confidence: float) -> None:
+    """Render visually distinct evidence state indicator."""
+    if status == EvidenceStatus.SUFFICIENT:
+        st.success(f"**Evidence Status: SUFFICIENT** (Retrieval Confidence: {confidence:.0%})")
+    elif status == EvidenceStatus.MARGINAL:
+        st.warning(
+            f"**Evidence Status: MARGINAL** (Retrieval Confidence: {confidence:.0%})\n\n"
+            "⚠️ *The policy evidence is related but incomplete for your specific query. The answer below is cautious and limited to verified facts.*"
+        )
+    elif status == EvidenceStatus.INSUFFICIENT:
+        st.info(
+            "**Evidence Status: INSUFFICIENT**\n\n"
+            "ℹ️ *The uploaded policy document does not contain sufficient verified evidence to answer this question. No coverage assumptions were made.*"
+        )
+    elif status == EvidenceStatus.CONFLICTING:
+        st.error(
+            "**Evidence Status: CONFLICTING**\n\n"
+            "🚨 *Contradictory policy terms were detected across retrieved clauses. Please verify with the insurer before relying on these figures.*"
+        )
+
+
+def main() -> None:
+    """Main Streamlit application entry point."""
+    st.set_page_config(
+        page_title="Insurance Policy Explainer",
+        page_icon="🛡️",
+        layout="wide",
+    )
+
+    # Initialize Session State
+    if "active_doc" not in st.session_state:
+        st.session_state.active_doc = None
+    if "active_chunks" not in st.session_state:
+        st.session_state.active_chunks = []
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = []
+    if "uploaded_filename" not in st.session_state:
+        st.session_state.uploaded_filename = None
+
+    # Sidebar: Policy Upload & Configuration
+    with st.sidebar:
+        st.title("🛡️ Policy Setup")
+        st.markdown("Upload your health or motor insurance policy PDF to start asking grounded questions.")
+
+        uploaded_file = st.file_uploader(
+            "Upload Policy PDF",
+            type=["pdf"],
+            help="Upload an insurance policy document (text or scanned PDF).",
+        )
+
+        # Handle File Upload & Processing
+        if uploaded_file is not None and uploaded_file.name != st.session_state.uploaded_filename:
+            with st.spinner("Processing policy document and building FAISS index..."):
+                try:
+                    file_bytes = uploaded_file.read()
+                    doc, chunks = process_uploaded_policy(file_bytes, uploaded_file.name)
+
+                    # Update active document in session state (enforces strict document isolation)
+                    st.session_state.active_doc = doc
+                    st.session_state.active_chunks = chunks
+                    st.session_state.uploaded_filename = uploaded_file.name
+                    st.session_state.chat_history = []  # Reset chat history for new policy
+
+                    st.toast("Policy processed and indexed successfully!", icon="✅")
+                except Exception as e:
+                    logger.error("Error processing uploaded PDF: %s", e)
+                    st.error(f"Failed to process policy: {str(e)}")
+
+        # Language Selection
+        st.divider()
+        st.subheader("🌐 Answer Language")
+        lang_choice = st.radio(
+            "Select language:",
+            ["English", "தமிழ் (Tamil)"],
+            index=0,
+            horizontal=True,
+        )
+        selected_language = "ta" if "Tamil" in lang_choice else "en"
+
+        # Active Policy Metadata Card
+        st.divider()
+        st.subheader("📄 Active Policy Information")
+        active_doc: Optional[Document] = st.session_state.active_doc
+
+        if active_doc is not None:
+            st.write(f"**File:** `{active_doc.filename}`")
+            st.write(f"**Pages:** {active_doc.page_count}")
+            st.write(f"**Chunks:** {len(st.session_state.active_chunks)}")
+
+            # Quality Display
+            if active_doc.quality == DocumentQuality.GOOD:
+                st.success("Quality: GOOD (Native text layer verified)")
+            elif active_doc.quality == DocumentQuality.WARNING:
+                st.warning("Quality: WARNING (Some pages have low text yield)")
+            elif active_doc.quality == DocumentQuality.OCR_REQUIRED:
+                st.info("Quality: OCR REQUIRED (Scanned pages detected)")
+            else:
+                st.error(f"Quality: {active_doc.quality.value} (Extraction unreliable)")
+
+            if active_doc.ocr_page_ids:
+                st.caption(f"OCR applied on pages: {active_doc.ocr_page_ids}")
+
+            if st.button("🗑️ Clear Active Policy"):
+                st.session_state.active_doc = None
+                st.session_state.active_chunks = []
+                st.session_state.chat_history = []
+                st.session_state.uploaded_filename = None
+                st.rerun()
+        else:
+            st.info("No policy active. Please upload a PDF above.")
+
+    # Main Area: Chat & Question Interface
+    st.header("📋 Insurance Policy Explainer")
+    st.caption("Ask questions in English or Tamil. All answers are strictly grounded in your policy with page citations.")
+
+    if active_doc is None:
+        st.info("👈 Please upload an insurance policy PDF in the sidebar to get started.")
+        st.markdown(
+            """
+            ### What this application does:
+            - **Strict Grounding:** Answers are generated exclusively from your uploaded policy clauses.
+            - **Zero Hallucination:** Never guesses or assumes unwritten terms.
+            - **Page Citations:** Every claim links directly to the source page and clause.
+            - **Bilingual:** Ask and receive answers in either English or Tamil.
+            - **Exclusions & Limits:** Clarifies waiting periods, co-pay percentages, and sub-limits verbatim.
+            """
+        )
+        return
+
+    # Check if document quality allows querying
+    if active_doc.quality in {DocumentQuality.FAILED, DocumentQuality.POOR}:
+        st.error(
+            "⚠️ The uploaded document text could not be extracted with sufficient reliability. "
+            "Querying is disabled to prevent inaccurate or misleading insurance information."
+        )
+        return
+
+    # Render Chat History
+    for chat_item in st.session_state.chat_history:
+        with st.chat_message("user"):
+            st.write(chat_item["query"])
+
+        with st.chat_message("assistant"):
+            grounded_ans: GroundedAnswer = chat_item["answer"]
+            render_evidence_status_badge(grounded_ans.evidence_status, grounded_ans.confidence)
+            st.markdown(grounded_ans.answer)
+            render_citations(grounded_ans.citations)
+
+    # Chat Input Box
+    query = st.chat_input("Ask a question about this policy (e.g., 'What is the waiting period for pre-existing diseases?')...")
+
+    if query:
+        # Display user message immediately
+        with st.chat_message("user"):
+            st.write(query)
+
+        # Process question through RAG pipeline
+        with st.chat_message("assistant"):
+            with st.spinner("Searching policy clauses, validating evidence, and generating grounded answer..."):
+                try:
+                    grounded_ans = answer_policy_question(
+                        doc_id=active_doc.doc_id,
+                        query=query,
+                        language=selected_language,
+                    )
+
+                    render_evidence_status_badge(grounded_ans.evidence_status, grounded_ans.confidence)
+                    st.markdown(grounded_ans.answer)
+                    render_citations(grounded_ans.citations)
+
+                    # Append to session state chat history
+                    st.session_state.chat_history.append({
+                        "query": query,
+                        "answer": grounded_ans,
+                        "language": selected_language,
+                    })
+
+                except MissingAPIKeyError:
+                    st.warning(
+                        "⚠️ **Gemini API key is not configured.**\n\n"
+                        "To generate AI answers, please configure `GEMINI_API_KEY` in your `.env` file. "
+                        "Retrieval and evidence validation are fully operational."
+                    )
+                except ModelUnavailableError as e:
+                    st.error(f"Configured Gemini model is unavailable: {str(e)}")
+                except GenerationTimeoutError:
+                    st.error("The answer generation request timed out. Please try asking again.")
+                except IndexNotFoundError:
+                    st.error("The policy index could not be located. Please re-upload the document.")
+                except InsuranceExplainerError as e:
+                    st.error(f"Application error: {str(e)}")
+                except Exception as e:
+                    logger.exception("Unexpected error in chat answering: %s", e)
+                    st.error("An unexpected error occurred while answering your question. Please try again.")
+
+
+if __name__ == "__main__":
+    main()

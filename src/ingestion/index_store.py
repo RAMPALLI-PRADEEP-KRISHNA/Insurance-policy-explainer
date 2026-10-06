@@ -280,7 +280,22 @@ class IndexStore:
         except Exception as e:
             raise CorruptedIndexError(f"Failed to read metadata for {document_id}: {str(e)}")
 
+    def is_fresh(self, document_id: str, file_hash: str) -> bool:
+        """Check if an index exists, matches the provided file hash, and has valid schema."""
+        if not self.index_exists(document_id):
+            return False
+        try:
+            meta = self.get_metadata(document_id)
+            return (
+                meta.file_hash == file_hash
+                and meta.index_schema_version == self.schema_version
+                and meta.embedding_dimension == self.embedder.dimension
+            )
+        except Exception:
+            return False
+
     def _is_index_current(
+
         self,
         meta: IndexMetadata,
         document: Document,
