@@ -119,9 +119,8 @@ Adversarial evaluation surfaced five genuine defects in the codebase that were i
 
 ### B. Live External Validation
 **Gemini live validation: BLOCKED**
-- **Reason:** `GEMINI_API_KEY` is not configured in the current environment.
+- **Reason:** While the `GEMINI_API_KEY` was successfully configured, the actual API request failed with a `503 UNAVAILABLE` error ("This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.") preventing live validation.
 - Therefore:
-  - no valid Gemini API request was completed;
   - no live Gemini answer quality claim is made;
   - no live Gemini Tamil-generation claim is made;
   - no live Gemini citation-generation claim is made.
@@ -133,7 +132,7 @@ Adversarial evaluation surfaced five genuine defects in the codebase that were i
 
 ## 7. Conclusion & Demonstration Readiness
 
-The application has passed deterministic backend, integration, evaluation, and programmatic UI validation. The live Gemini generation path and real browser interaction remain unverified in the current environment because a valid GEMINI_API_KEY and traditional GUI browser were unavailable.
+The application has passed deterministic backend, integration, evaluation, and programmatic UI validation. The live Gemini generation path was attempted but remains unverified because the Gemini API service was temporarily unavailable (503 error), and real browser interaction remains unverified because a traditional GUI browser was unavailable.
 
 **Final Status:**
 **TECHNICALLY VALIDATED — LIVE GEMINI AND REAL BROWSER VALIDATION PENDING**
