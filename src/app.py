@@ -21,6 +21,16 @@ from src.models.data_models import (
     RedFlagReport,
     RiskCategory,
     RiskSeverity,
+    ComparisonCategory,
+    ComparisonCellStatus,
+    ComparisonFact,
+    ComparisonRow,
+    ComparisonReport,
+)
+from src.comparison.comparison_engine import (
+    comparison_engine,
+    ComparisonEngine,
+    compare_policies,
 )
 from src.risk_scanner.red_flag_scanner import (
     red_flag_scanner,
@@ -154,9 +164,106 @@ def scan_policy_red_flags(
     return scanner.scan(document=document, chunks=chunks)
 
 
+def compare_uploaded_policies(
+    doc_a: Document,
+    doc_b: Document,
+    chunks_a: Optional[List[Chunk]] = None,
+    chunks_b: Optional[List[Chunk]] = None,
+    engine_instance: Optional[ComparisonEngine] = None,
+) -> ComparisonReport:
+    """
+    Execute side-by-side policy comparison between Policy A and Policy B.
+
+    Args:
+        doc_a: Policy A Document.
+        doc_b: Policy B Document.
+        chunks_a: Optional pre-loaded chunks for Policy A.
+        chunks_b: Optional pre-loaded chunks for Policy B.
+        engine_instance: Optional ComparisonEngine instance.
+
+    Returns:
+        ComparisonReport with side-by-side rows, facts, and difference descriptions.
+    """
+    engine = engine_instance or comparison_engine
+    return engine.compare(doc_a=doc_a, doc_b=doc_b, chunks_a=chunks_a, chunks_b=chunks_b)
+
+
 # =====================================================================
 # STREAMLIT UI COMPONENTS
 # =====================================================================
+
+def _format_status_badge(status: ComparisonCellStatus) -> str:
+    """Format visual status badge preserving uncertainty."""
+    if status == ComparisonCellStatus.FOUND:
+        return "🟢 **FOUND**"
+    elif status == ComparisonCellStatus.AMBIGUOUS:
+        return "🟡 **AMBIGUOUS**"
+    elif status == ComparisonCellStatus.NOT_MENTIONED:
+        return "⚪ **NOT MENTIONED**"
+    elif status == ComparisonCellStatus.EXPLICITLY_ABSENT:
+        return "🔵 **EXPLICITLY ABSENT**"
+    return str(status)
+
+
+def render_comparison_report(report: ComparisonReport) -> None:
+    """Render structured two-policy comparison matrix with isolated citations."""
+    st.markdown("### ⚖️ Side-by-Side Policy Comparison Matrix")
+    st.caption("Objective comparison of documented policy terms. Preserves uncertainty and avoids subjective ranking.")
+
+    # Headers for Policy A and Policy B
+    col_a, col_b = st.columns(2)
+    with col_a:
+        st.info(f"**Policy A:** `{report.filename_a}`\n\nDoc ID: `{report.doc_id_a[:8]}...`")
+    with col_b:
+        st.info(f"**Policy B:** `{report.filename_b}`\n\nDoc ID: `{report.doc_id_b[:8]}...`")
+
+    st.markdown("---")
+
+    for idx, row in enumerate(report.rows, start=1):
+        st.markdown(f"#### {idx}. {row.label}")
+
+        col_fa, col_fb, col_diff = st.columns([1, 1, 1.2])
+
+        # Policy A Fact Cell
+        with col_fa:
+            st.caption(f"**Policy A ({report.filename_a}):**")
+            badge_a = _format_status_badge(row.policy_a_fact.status)
+            st.markdown(f"{badge_a}")
+            if row.policy_a_fact.original_value:
+                st.markdown(f"**Value:** `{row.policy_a_fact.original_value}`")
+            if row.policy_a_fact.conditions:
+                st.caption(f"Conditions: *{row.policy_a_fact.conditions}*")
+            st.write(row.policy_a_fact.description)
+
+            if row.policy_a_fact.citations:
+                with st.expander(f"📌 Policy A Source (Page {row.policy_a_fact.citations[0].page_number})"):
+                    st.caption(f"Section: {row.policy_a_fact.citations[0].section or 'N/A'}")
+                    st.info(f'"{row.policy_a_fact.citations[0].source_snippet}"')
+
+        # Policy B Fact Cell
+        with col_fb:
+            st.caption(f"**Policy B ({report.filename_b}):**")
+            badge_b = _format_status_badge(row.policy_b_fact.status)
+            st.markdown(f"{badge_b}")
+            if row.policy_b_fact.original_value:
+                st.markdown(f"**Value:** `{row.policy_b_fact.original_value}`")
+            if row.policy_b_fact.conditions:
+                st.caption(f"Conditions: *{row.policy_b_fact.conditions}*")
+            st.write(row.policy_b_fact.description)
+
+            if row.policy_b_fact.citations:
+                with st.expander(f"📌 Policy B Source (Page {row.policy_b_fact.citations[0].page_number})"):
+                    st.caption(f"Section: {row.policy_b_fact.citations[0].section or 'N/A'}")
+                    st.info(f'"{row.policy_b_fact.citations[0].source_snippet}"')
+
+        # Difference Cell
+        with col_diff:
+            st.caption("**Comparison / Difference:**")
+            st.markdown(f"💡 *{row.difference}*")
+
+        st.markdown("---")
+
+    st.caption(f"⚠️ **Disclaimer:** {report.disclaimer}")
 
 def render_red_flags(report: RedFlagReport) -> None:
     """Render categorized red flags with review priority badges and citations."""
@@ -280,6 +387,12 @@ def main() -> None:
         st.session_state.uploaded_filename = None
     if "red_flag_report" not in st.session_state:
         st.session_state.red_flag_report = None
+    if "comparison_report" not in st.session_state:
+        st.session_state.comparison_report = None
+    if "policy_b_doc" not in st.session_state:
+        st.session_state.policy_b_doc = None
+    if "policy_b_chunks" not in st.session_state:
+        st.session_state.policy_b_chunks = []
 
     # Sidebar: Policy Upload & Configuration
     with st.sidebar:
@@ -305,6 +418,9 @@ def main() -> None:
                     st.session_state.uploaded_filename = uploaded_file.name
                     st.session_state.chat_history = []  # Reset chat history for new policy
                     st.session_state.red_flag_report = None  # Reset report for new policy
+                    st.session_state.comparison_report = None
+                    st.session_state.policy_b_doc = None
+                    st.session_state.policy_b_chunks = []
 
                     st.toast("Policy processed and indexed successfully!", icon="✅")
                 except Exception as e:
@@ -351,6 +467,9 @@ def main() -> None:
                 st.session_state.chat_history = []
                 st.session_state.uploaded_filename = None
                 st.session_state.red_flag_report = None
+                st.session_state.comparison_report = None
+                st.session_state.policy_b_doc = None
+                st.session_state.policy_b_chunks = []
                 st.rerun()
         else:
             st.info("No policy active. Please upload a PDF above.")
@@ -381,8 +500,12 @@ def main() -> None:
         )
         return
 
-    # Tabs for Question Answering and Red-Flag Scanner
-    tab_chat, tab_scanner = st.tabs(["💬 Ask Questions", "🚩 Policy Red-Flag Scanner"])
+    # Tabs for Question Answering, Red-Flag Scanner, and Policy Comparison
+    tab_chat, tab_scanner, tab_compare = st.tabs([
+        "💬 Ask Questions",
+        "🚩 Policy Red-Flag Scanner",
+        "⚖️ Compare Policies",
+    ])
 
     with tab_chat:
         # Render Chat History
@@ -463,6 +586,51 @@ def main() -> None:
             render_red_flags(st.session_state.red_flag_report)
         else:
             st.info("Click '🔍 Scan Policy for Red Flags' to analyze this policy for important clauses and restrictions.")
+
+    with tab_compare:
+        st.subheader("⚖️ Two-Policy Comparison Engine")
+        st.caption("Side-by-side grounded comparison across 12 standardized insurance dimensions.")
+
+        st.info(f"**Policy A (Active Policy):** `{active_doc.filename}` ({active_doc.page_count} pages)")
+
+        uploaded_file_b = st.file_uploader(
+            "Upload Policy B PDF to Compare:",
+            type=["pdf"],
+            key="compare_policy_b_uploader",
+            help="Upload a second insurance policy to compare against Policy A.",
+        )
+
+        col_cmp_btn, col_cmp_info = st.columns([1, 2])
+        with col_cmp_btn:
+            compare_clicked = st.button("⚖️ Compare Policies", type="primary")
+
+        if compare_clicked and uploaded_file_b is not None:
+            with st.spinner("Processing Policy B and running grounded side-by-side comparison..."):
+                try:
+                    file_b_bytes = uploaded_file_b.read()
+                    doc_b, chunks_b = process_uploaded_policy(file_b_bytes, uploaded_file_b.name)
+                    st.session_state.policy_b_doc = doc_b
+                    st.session_state.policy_b_chunks = chunks_b
+
+                    report = compare_uploaded_policies(
+                        doc_a=active_doc,
+                        doc_b=doc_b,
+                        chunks_a=st.session_state.active_chunks,
+                        chunks_b=chunks_b,
+                    )
+                    st.session_state.comparison_report = report
+                    st.toast("Comparison generated successfully!", icon="✅")
+                except Exception as e:
+                    logger.exception("Error running policy comparison: %s", e)
+                    st.error(f"Comparison failed: {str(e)}")
+
+        elif compare_clicked and uploaded_file_b is None:
+            st.warning("Please upload Policy B above before comparing.")
+
+        if st.session_state.comparison_report is not None:
+            render_comparison_report(st.session_state.comparison_report)
+        else:
+            st.info("Upload Policy B above and click '⚖️ Compare Policies' to view the side-by-side comparison matrix.")
 
 
 if __name__ == "__main__":

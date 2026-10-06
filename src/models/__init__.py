@@ -20,6 +20,12 @@ from src.models.data_models import (
     RedFlag,
     RiskFinding,
     RedFlagReport,
+    ComparisonCategory,
+    ComparisonCellStatus,
+    ComparisonFact,
+    ComparisonRow,
+    ComparisonReport,
+    ComparisonResult,
 )
 
 __all__ = [
@@ -42,4 +48,10 @@ __all__ = [
     "RedFlag",
     "RiskFinding",
     "RedFlagReport",
+    "ComparisonCategory",
+    "ComparisonCellStatus",
+    "ComparisonFact",
+    "ComparisonRow",
+    "ComparisonReport",
+    "ComparisonResult",
 ]

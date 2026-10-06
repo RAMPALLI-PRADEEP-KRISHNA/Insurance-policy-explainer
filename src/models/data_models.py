@@ -2,7 +2,7 @@
 
 from datetime import datetime, timezone
 from enum import Enum
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 import uuid
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -322,6 +322,75 @@ class RedFlagReport(BaseModel):
         default="This review highlights policy clauses requiring attention. It does not constitute legal or financial advice and does not imply the policy is deficient.",
         description="Mandatory advisory disclaimer"
     )
+
+
+class ComparisonCategory(str, Enum):
+    """Canonical dimensions for policy comparison."""
+    WAITING_PERIOD_PRE_EXISTING = "WAITING_PERIOD_PRE_EXISTING"
+    WAITING_PERIOD_SPECIFIC_ILLNESS = "WAITING_PERIOD_SPECIFIC_ILLNESS"
+    INITIAL_WAITING_PERIOD = "INITIAL_WAITING_PERIOD"
+    ROOM_RENT_LIMIT = "ROOM_RENT_LIMIT"
+    CO_PAYMENT = "CO_PAYMENT"
+    DEDUCTIBLE = "DEDUCTIBLE"
+    PERMANENT_EXCLUSIONS = "PERMANENT_EXCLUSIONS"
+    SPECIFIC_EXCLUSIONS = "SPECIFIC_EXCLUSIONS"
+    AGE_LIMIT = "AGE_LIMIT"
+    DISEASE_PROCEDURE_LIMIT = "DISEASE_PROCEDURE_LIMIT"
+    RESTORATION = "RESTORATION"
+    CLAIM_CONDITIONS = "CLAIM_CONDITIONS"
+
+
+class ComparisonCellStatus(str, Enum):
+    """The four-state fact existence status preserving uncertainty."""
+    FOUND = "FOUND"                        # Explicitly documented in policy with supporting evidence
+    AMBIGUOUS = "AMBIGUOUS"                # Evidence identified but value or condition cannot safely be resolved
+    NOT_MENTIONED = "NOT_MENTIONED"        # No relevant evidence identified; benefit may or may not exist
+    EXPLICITLY_ABSENT = "EXPLICITLY_ABSENT"  # Policy explicitly states absence (e.g. 'no co-pay', 'not covered')
+
+
+class ComparisonFact(BaseModel):
+    """A normalized extracted fact for a single policy dimension."""
+    policy_id: str = Field(..., description="Foreign key to Document.doc_id")
+    filename: str = Field(..., description="Source policy filename")
+    category: ComparisonCategory = Field(..., description="Comparison category dimension")
+    status: ComparisonCellStatus = Field(..., description="Four-state existence status")
+    value: Optional[Union[float, int, str]] = Field(default=None, description="Normalized numeric or string value")
+    unit: Optional[str] = Field(default=None, description="Unit of measurement (e.g. months, percent, INR)")
+    original_value: Optional[str] = Field(default=None, description="Original verbatim value as found in text")
+    conditions: Optional[str] = Field(default=None, description="Conditional qualifiers (e.g. for age 61+, per day)")
+    description: str = Field(default="", description="Clear textual description grounded in policy text")
+    source_chunk_ids: List[str] = Field(default_factory=list, description="IDs of chunks supporting this fact")
+    citations: List[Citation] = Field(default_factory=list, description="Authoritative citations for this fact")
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0, description="Extraction confidence score")
+
+
+class ComparisonRow(BaseModel):
+    """Side-by-side comparison row across two policies for one category."""
+    category: ComparisonCategory = Field(..., description="Category dimension")
+    label: str = Field(..., description="Human-readable category label")
+    policy_a_fact: ComparisonFact = Field(..., description="Policy A extracted fact")
+    policy_b_fact: ComparisonFact = Field(..., description="Policy B extracted fact")
+    difference: str = Field(..., description="Objective, non-judgmental description of the difference")
+    difference_type: Optional[str] = Field(default=None, description="Classification of difference")
+
+
+class ComparisonReport(BaseModel):
+    """Complete two-policy comparison report matrix."""
+    comparison_id: str = Field(default_factory=lambda: str(uuid.uuid4()), description="Unique comparison run ID")
+    doc_id_a: str = Field(..., description="Policy A document ID")
+    doc_id_b: str = Field(..., description="Policy B document ID")
+    filename_a: str = Field(..., description="Policy A filename")
+    filename_b: str = Field(..., description="Policy B filename")
+    rows: List[ComparisonRow] = Field(default_factory=list, description="Side-by-side comparison rows")
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="Generation timestamp")
+    disclaimer: str = Field(
+        default="This comparison objectively contrasts documented policy terms. It does not rank policies or provide financial/legal advice.",
+        description="Mandatory comparison disclaimer"
+    )
+
+
+# Alias for backward compatibility with DATA_MODEL.md naming
+ComparisonResult = ComparisonReport
 
 
 

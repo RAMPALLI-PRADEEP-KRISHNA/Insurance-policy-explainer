@@ -177,3 +177,69 @@ def test_risk_scanner_data_models():
     )
     assert finding.found is True
     assert finding.severity == RiskSeverity.HIGH
+
+
+def test_comparison_data_models():
+    """Verify ComparisonCategory, ComparisonCellStatus, ComparisonFact, ComparisonRow, and ComparisonReport."""
+    from src.models.data_models import (
+        ComparisonCategory,
+        ComparisonCellStatus,
+        ComparisonFact,
+        ComparisonRow,
+        ComparisonReport,
+        Citation,
+    )
+
+    cit = Citation(
+        document_id="doc-a",
+        chunk_id="chunk-a",
+        filename="policy_a.pdf",
+        page_number=1,
+        page_numbers=[1],
+        source_snippet="Waiting period 36 months",
+    )
+
+    fact_a = ComparisonFact(
+        policy_id="doc-a",
+        filename="policy_a.pdf",
+        category=ComparisonCategory.WAITING_PERIOD_PRE_EXISTING,
+        status=ComparisonCellStatus.FOUND,
+        value=36.0,
+        unit="months",
+        original_value="36 months",
+        description="Pre-existing diseases waiting period: 36 months",
+        citations=[cit],
+    )
+    assert fact_a.status == ComparisonCellStatus.FOUND
+    assert fact_a.value == 36.0
+
+    fact_b = ComparisonFact(
+        policy_id="doc-b",
+        filename="policy_b.pdf",
+        category=ComparisonCategory.WAITING_PERIOD_PRE_EXISTING,
+        status=ComparisonCellStatus.NOT_MENTIONED,
+        description="No clause identified",
+    )
+    assert fact_b.status == ComparisonCellStatus.NOT_MENTIONED
+    assert fact_b.status != ComparisonCellStatus.EXPLICITLY_ABSENT
+
+    row = ComparisonRow(
+        category=ComparisonCategory.WAITING_PERIOD_PRE_EXISTING,
+        label="Pre-Existing Disease Waiting Period",
+        policy_a_fact=fact_a,
+        policy_b_fact=fact_b,
+        difference="Policy A specifies 36 months; no corresponding clause identified in Policy B.",
+    )
+    assert row.category == ComparisonCategory.WAITING_PERIOD_PRE_EXISTING
+
+    report = ComparisonReport(
+        doc_id_a="doc-a",
+        doc_id_b="doc-b",
+        filename_a="policy_a.pdf",
+        filename_b="policy_b.pdf",
+        rows=[row],
+    )
+    assert report.doc_id_a == "doc-a"
+    assert report.doc_id_b == "doc-b"
+    assert len(report.rows) == 1
+    assert "disclaimer" in report.model_dump()
