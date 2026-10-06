@@ -42,6 +42,9 @@ SPECIFIC_CONCEPT_FAMILIES = {
     "sum_insured": [
         "sum insured", "coverage amount", "policy limit", "காப்பீட்டுத் தொகை"
     ],
+    "age_limit": [
+        "entry age", "maximum age", "minimum age", "age limit", "age criteria", "18 years", "65 years", "வயது வரம்பு", "வயது"
+    ],
 }
 
 # General domain terms
@@ -58,7 +61,8 @@ GENERAL_DOMAIN_FAMILIES = {
 TABLE_QUERY_SIGNALS = [
     "room rent", "rent", "limit", "amount", "co-pay", "copay", "copayment",
     "percentage", "percent", "%", "₹", "rs", "inr", "charges", "share",
-    "deductible", "schedule", "benefit", "table", "rate", "fee"
+    "deductible", "schedule", "benefit", "table", "rate", "fee",
+    "வரம்பு", "வாடகை", "கட்டணம்", "அட்டவணை", "விழுக்காடு", "சதவீதம்"
 ]
 
 
@@ -94,6 +98,9 @@ class Retriever:
         chunk_meta_lower = f"{chunk.section or ''} {chunk.subsection or ''}".lower()
         full_chunk_scope = f"{chunk_meta_lower} {chunk_text_lower}"
 
+        q_norm = q_lower.replace("-", " ")
+        scope_norm = full_chunk_scope.replace("-", " ")
+
         signals = {"numeric": 0.0, "specific_concept": 0.0, "general_domain": 0.0, "table": 0.0}
 
         # 1. Numeric Match
@@ -102,21 +109,21 @@ class Retriever:
 
         # 2. Specific Concept Match (Differentiator)
         for _, keywords in SPECIFIC_CONCEPT_FAMILIES.items():
-            if any(kw in q_lower for kw in keywords):
-                if any(kw in full_chunk_scope for kw in keywords):
+            if any(kw in q_norm or kw in q_lower for kw in keywords):
+                if any(kw in scope_norm or kw in full_chunk_scope for kw in keywords):
                     signals["specific_concept"] = self.config.KEYWORD_BOOST_RISK
                     break
 
         # 3. General Domain Match
         for _, keywords in GENERAL_DOMAIN_FAMILIES.items():
-            if any(kw in q_lower for kw in keywords):
-                if any(kw in full_chunk_scope for kw in keywords):
+            if any(kw in q_norm or kw in q_lower for kw in keywords):
+                if any(kw in scope_norm or kw in full_chunk_scope for kw in keywords):
                     signals["general_domain"] = 0.05
                     break
 
         # 4. Table Signal
         if chunk.chunk_type == ChunkType.TABLE:
-            if any(signal in q_lower for signal in TABLE_QUERY_SIGNALS):
+            if any(signal in q_norm or signal in q_lower for signal in TABLE_QUERY_SIGNALS):
                 signals["table"] = self.config.KEYWORD_BOOST_TABLE
 
         raw_boost = signals["numeric"] + signals["specific_concept"] + signals["general_domain"] + signals["table"]

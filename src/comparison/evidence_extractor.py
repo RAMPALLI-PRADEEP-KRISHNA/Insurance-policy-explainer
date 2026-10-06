@@ -19,6 +19,7 @@ from src.models.data_models import (
     ComparisonFact,
     Document,
 )
+from src.retrieval.numeric_utils import extract_numeric_entities
 from src.retrieval.retriever import retriever, Retriever
 from src.utils.logging_utils import get_logger
 
@@ -110,21 +111,28 @@ class ComparisonEvidenceExtractor:
         category: ComparisonCategory,
         all_chunks: List[Chunk],
     ) -> List[Chunk]:
-        """Find candidate chunks matching the category via hybrid retrieval or keyword filter."""
-        # Check if index exists for dense retrieval
+        """Find candidate chunks matching the category via keyword filtering and hybrid retrieval."""
+        # 1. Direct keyword match
+        kw_chunks = [c for c in all_chunks if self._matches_category_keywords(category, c.text)]
+        if kw_chunks:
+            return kw_chunks
+
+        # 2. Dense retrieval fallback if index exists
         if self.index_store.index_exists(document.doc_id):
             try:
                 query = CATEGORY_QUERIES.get(category, category.value.replace("_", " "))
                 results = self.retriever.retrieve(doc_id=document.doc_id, query=query, top_k=5)
-                # Keep chunks where score passes a reasonable relevance threshold
-                matched_ids = {r.chunk_id for r in results if r.similarity_score >= 0.25}
+                # Keep chunks where score passes threshold AND matches category keywords
+                matched_ids = {
+                    r.chunk_id for r in results
+                    if r.final_score >= 0.50 and self._matches_category_keywords(category, r.text)
+                }
                 if matched_ids:
                     return [c for c in all_chunks if c.chunk_id in matched_ids]
             except Exception as e:
                 logger.warning("Retriever search fallback in comparison extractor: %s", e)
 
-        # Keyword filtering fallback
-        return [c for c in all_chunks if self._matches_category_keywords(category, c.text)]
+        return []
 
     def _matches_category_keywords(self, category: ComparisonCategory, text: str) -> bool:
         """Heuristic keyword matching for category identification."""
@@ -276,8 +284,31 @@ class ComparisonEvidenceExtractor:
                         val, unit, orig_val, cond = v, u, o, c
                         break
 
+                elif category == ComparisonCategory.AGE_LIMIT:
+                    entities = extract_numeric_entities(line)
+                    ages = [e for e in entities if e.entity_type in {"age", "duration_years"} and e.value is not None]
+                    if ages:
+                        max_age = max(a.value for a in ages)
+                        val = float(max_age)
+                        unit = "years"
+                        orig_val = f"{int(max_age)} years"
+                        cond = "entry age limit"
+                        break
+
             if val is not None:
                 break
+
+        # If numeric category has no value and no matching clause, preserve uncertainty
+        if val is None and category in {
+            ComparisonCategory.WAITING_PERIOD_PRE_EXISTING,
+            ComparisonCategory.WAITING_PERIOD_SPECIFIC_ILLNESS,
+            ComparisonCategory.INITIAL_WAITING_PERIOD,
+            ComparisonCategory.ROOM_RENT_LIMIT,
+            ComparisonCategory.CO_PAYMENT,
+            ComparisonCategory.DEDUCTIBLE,
+            ComparisonCategory.AGE_LIMIT,
+        }:
+            return self._make_not_mentioned_fact(document, category)
 
         # Description text
         desc = best_snippet.strip().replace("\n", " ")

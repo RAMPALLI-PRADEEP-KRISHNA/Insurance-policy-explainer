@@ -1,0 +1,351 @@
+{
+  "description": "Deterministic Evaluation Dataset for Insurance Policy Explainer (Phase 7)",
+  "cases": [
+    {
+      "id": "direct_factual_ped_waiting",
+      "category": "direct_factual",
+      "fixture": "tests/fixtures/sample_policy_fixture.pdf",
+      "query": "What is the pre-existing disease waiting period?",
+      "language": "en",
+      "expected_sufficiency": "SUFFICIENT",
+      "expected_target_pages": [2],
+      "expected_keywords": ["pre-existing", "waiting period", "36 months"],
+      "expected_numbers": [{"value": 36, "context": "months"}],
+      "should_abstain": false
+    },
+    {
+      "id": "direct_factual_specific_illness_waiting",
+      "category": "direct_factual",
+      "fixture": "tests/fixtures/sample_policy_fixture.pdf",
+      "query": "What is the specific disease waiting period for procedures like cataract?",
+      "language": "en",
+      "expected_sufficiency": "SUFFICIENT",
+      "expected_target_pages": [2],
+      "expected_keywords": ["specific disease", "24 months", "cataract"],
+      "expected_numbers": [{"value": 24, "context": "months"}],
+      "should_abstain": false
+    },
+    {
+      "id": "direct_factual_initial_waiting",
+      "category": "direct_factual",
+      "fixture": "tests/fixtures/sample_policy_fixture.pdf",
+      "query": "What is the initial waiting period?",
+      "language": "en",
+      "expected_sufficiency": "SUFFICIENT",
+      "expected_target_pages": [2],
+      "expected_keywords": ["initial waiting period", "30 days"],
+      "expected_numbers": [{"value": 30, "context": "days"}],
+      "should_abstain": false
+    },
+    {
+      "id": "direct_factual_room_rent",
+      "category": "direct_factual",
+      "fixture": "tests/fixtures/sample_policy_fixture.pdf",
+      "query": "What is the room-rent limit?",
+      "language": "en",
+      "expected_sufficiency": "SUFFICIENT",
+      "expected_target_pages": [1],
+      "expected_keywords": ["room rent", "1%"],
+      "expected_numbers": [{"value": 1, "context": "%"}],
+      "should_abstain": false
+    },
+    {
+      "id": "direct_factual_copayment",
+      "category": "direct_factual",
+      "fixture": "tests/fixtures/sample_policy_fixture.pdf",
+      "query": "What is the co-payment?",
+      "language": "en",
+      "expected_sufficiency": "SUFFICIENT",
+      "expected_target_pages": [1],
+      "expected_keywords": ["co-payment", "10%"],
+      "expected_numbers": [{"value": 10, "context": "%"}],
+      "should_abstain": false
+    },
+    {
+      "id": "direct_factual_entry_age",
+      "category": "direct_factual",
+      "fixture": "tests/fixtures/sample_policy_fixture.pdf",
+      "query": "What is the entry-age limit?",
+      "language": "en",
+      "expected_sufficiency": "SUFFICIENT",
+      "expected_target_pages": [1],
+      "expected_keywords": ["entry age", "18", "65"],
+      "expected_numbers": [{"value": 18, "context": "years"}, {"value": 65, "context": "years"}],
+      "should_abstain": false
+    },
+    {
+      "id": "numeric_waiting_period_duration",
+      "category": "numeric",
+      "fixture": "tests/fixtures/sample_policy_fixture.pdf",
+      "query": "Is the pre-existing waiting period 24 or 36 months?",
+      "language": "en",
+      "expected_sufficiency": "SUFFICIENT",
+      "expected_target_pages": [2],
+      "expected_keywords": ["36 months"],
+      "expected_numbers": [{"value": 36, "context": "months"}],
+      "should_abstain": false
+    },
+    {
+      "id": "numeric_room_rent_percentage",
+      "category": "numeric",
+      "fixture": "tests/fixtures/sample_policy_fixture.pdf",
+      "query": "What percentage of Sum Insured applies to room rent per day?",
+      "language": "en",
+      "expected_sufficiency": "SUFFICIENT",
+      "expected_target_pages": [1],
+      "expected_keywords": ["1%"],
+      "expected_numbers": [{"value": 1, "context": "%"}],
+      "should_abstain": false
+    },
+    {
+      "id": "numeric_copay_trigger_age",
+      "category": "numeric",
+      "fixture": "tests/fixtures/sample_policy_fixture.pdf",
+      "query": "What age triggers the co-payment?",
+      "language": "en",
+      "expected_sufficiency": "SUFFICIENT",
+      "expected_target_pages": [1],
+      "expected_keywords": ["61"],
+      "expected_numbers": [{"value": 61, "context": "age"}],
+      "should_abstain": false
+    },
+    {
+      "id": "conditional_copay_senior",
+      "category": "conditional",
+      "fixture": "tests/fixtures/sample_policy_fixture.pdf",
+      "query": "What co-payment applies to someone aged 61 or above?",
+      "language": "en",
+      "expected_sufficiency": "SUFFICIENT",
+      "expected_target_pages": [1],
+      "expected_keywords": ["10%", "61"],
+      "expected_numbers": [{"value": 10, "context": "%"}, {"value": 61, "context": "age"}],
+      "should_abstain": false
+    },
+    {
+      "id": "conditional_initial_waiting_accidents",
+      "category": "conditional",
+      "fixture": "tests/fixtures/sample_policy_fixture.pdf",
+      "query": "Does the initial waiting period apply to accidents?",
+      "language": "en",
+      "expected_sufficiency": "SUFFICIENT",
+      "expected_target_pages": [2],
+      "expected_keywords": ["except accidents"],
+      "expected_numbers": [{"value": 30, "context": "days"}],
+      "should_abstain": false
+    },
+    {
+      "id": "conditional_aesthetic_surgery",
+      "category": "conditional",
+      "fixture": "tests/fixtures/policy_b_fixture.pdf",
+      "query": "Under what conditions is aesthetic surgery covered?",
+      "language": "en",
+      "expected_sufficiency": "SUFFICIENT",
+      "expected_target_pages": [2],
+      "expected_keywords": ["aesthetic surgery", "accidental injury"],
+      "expected_numbers": [],
+      "should_abstain": false
+    },
+    {
+      "id": "negative_deductible_not_mentioned",
+      "category": "negative_absence",
+      "fixture": "tests/fixtures/sample_policy_fixture.pdf",
+      "query": "Does this policy have a deductible?",
+      "language": "en",
+      "expected_sufficiency": "INSUFFICIENT",
+      "expected_target_pages": [],
+      "expected_keywords": [],
+      "expected_numbers": [],
+      "expected_cell_status": "NOT_MENTIONED",
+      "should_abstain": true
+    },
+    {
+      "id": "negative_deductible_explicitly_absent",
+      "category": "negative_absence",
+      "fixture": "tests/evaluation/fixtures/explicit_absence_policy_fixture.pdf",
+      "query": "Does this policy have a deductible?",
+      "language": "en",
+      "expected_sufficiency": "SUFFICIENT",
+      "expected_target_pages": [1],
+      "expected_keywords": ["no deductible", "nil"],
+      "expected_numbers": [],
+      "expected_cell_status": "EXPLICITLY_ABSENT",
+      "should_abstain": false
+    },
+    {
+      "id": "negative_copay_explicitly_absent",
+      "category": "negative_absence",
+      "fixture": "tests/evaluation/fixtures/explicit_absence_policy_fixture.pdf",
+      "query": "Is co-payment absent in this policy?",
+      "language": "en",
+      "expected_sufficiency": "SUFFICIENT",
+      "expected_target_pages": [1],
+      "expected_keywords": ["no co-payment", "0%"],
+      "expected_numbers": [{"value": 0, "context": "%"}],
+      "expected_cell_status": "EXPLICITLY_ABSENT",
+      "should_abstain": false
+    },
+    {
+      "id": "unanswerable_maternity_benefit",
+      "category": "unanswerable",
+      "fixture": "tests/fixtures/sample_policy_fixture.pdf",
+      "query": "What is the maternity benefit limit under this policy?",
+      "language": "en",
+      "expected_sufficiency": "MARGINAL",
+      "expected_target_pages": [],
+      "expected_keywords": [],
+      "expected_numbers": [],
+      "should_abstain": true
+    },
+    {
+      "id": "unanswerable_dental_coverage",
+      "category": "unanswerable",
+      "fixture": "tests/fixtures/sample_policy_fixture.pdf",
+      "query": "What is the dental coverage limit?",
+      "language": "en",
+      "expected_sufficiency": "MARGINAL",
+      "expected_target_pages": [],
+      "expected_keywords": [],
+      "expected_numbers": [],
+      "should_abstain": true
+    },
+    {
+      "id": "unanswerable_organ_donor",
+      "category": "unanswerable",
+      "fixture": "tests/fixtures/sample_policy_fixture.pdf",
+      "query": "What are the organ donor expense limits?",
+      "language": "en",
+      "expected_sufficiency": "INSUFFICIENT",
+      "expected_target_pages": [],
+      "expected_keywords": [],
+      "expected_numbers": [],
+      "should_abstain": true
+    },
+    {
+      "id": "conflicting_ped_waiting_period",
+      "category": "conflicting",
+      "fixture": "tests/evaluation/fixtures/conflicting_policy_fixture.pdf",
+      "query": "What is the pre-existing disease waiting period?",
+      "language": "en",
+      "expected_sufficiency": "CONFLICTING",
+      "expected_target_pages": [1, 2],
+      "expected_keywords": ["24 months", "48 months"],
+      "expected_numbers": [{"value": 24, "context": "months"}, {"value": 48, "context": "months"}],
+      "should_abstain": false
+    },
+    {
+      "id": "conflicting_copayment",
+      "category": "conflicting",
+      "fixture": "tests/evaluation/fixtures/conflicting_policy_fixture.pdf",
+      "query": "What is the co-payment percentage?",
+      "language": "en",
+      "expected_sufficiency": "CONFLICTING",
+      "expected_target_pages": [1, 2],
+      "expected_keywords": ["10%", "20%"],
+      "expected_numbers": [{"value": 10, "context": "%"}, {"value": 20, "context": "%"}],
+      "should_abstain": false
+    },
+    {
+      "id": "tamil_ped_waiting_period",
+      "category": "tamil",
+      "fixture": "tests/fixtures/sample_policy_fixture.pdf",
+      "query": "பாலிசியில் ஏற்கனவே உள்ள நோய்களுக்கான காத்திருப்பு காலம் என்ன?",
+      "language": "ta",
+      "expected_sufficiency": "SUFFICIENT",
+      "expected_target_pages": [2],
+      "expected_keywords": ["36"],
+      "expected_numbers": [{"value": 36, "context": "months"}],
+      "should_abstain": false
+    },
+    {
+      "id": "tamil_room_rent_limit",
+      "category": "tamil",
+      "fixture": "tests/fixtures/sample_policy_fixture.pdf",
+      "query": "அறை வாடகை வரம்பு என்ன?",
+      "language": "ta",
+      "expected_sufficiency": "SUFFICIENT",
+      "expected_target_pages": [1],
+      "expected_keywords": ["1%"],
+      "expected_numbers": [{"value": 1, "context": "%"}],
+      "should_abstain": false
+    },
+    {
+      "id": "tamil_initial_waiting_period",
+      "category": "tamil",
+      "fixture": "tests/fixtures/sample_policy_fixture.pdf",
+      "query": "ஆரம்ப காத்திருப்பு காலம் எத்தனை நாட்கள்?",
+      "language": "ta",
+      "expected_sufficiency": "SUFFICIENT",
+      "expected_target_pages": [2],
+      "expected_keywords": ["30"],
+      "expected_numbers": [{"value": 30, "context": "days"}],
+      "should_abstain": false
+    },
+    {
+      "id": "tamil_copayment",
+      "category": "tamil",
+      "fixture": "tests/fixtures/sample_policy_fixture.pdf",
+      "query": "பாலிசியில் இணை கட்டணம் (co-payment) எவ்வளவு?",
+      "language": "ta",
+      "expected_sufficiency": "SUFFICIENT",
+      "expected_target_pages": [1],
+      "expected_keywords": ["10%"],
+      "expected_numbers": [{"value": 10, "context": "%"}],
+      "should_abstain": false
+    }
+  ],
+  "comparison_cases": [
+    {
+      "id": "comparison_policy_a_vs_b",
+      "fixture_a": "tests/fixtures/policy_a_fixture.pdf",
+      "fixture_b": "tests/fixtures/policy_b_fixture.pdf",
+      "expected_rows": {
+        "WAITING_PERIOD_PRE_EXISTING": {
+          "status_a": "FOUND",
+          "val_a": 36.0,
+          "status_b": "FOUND",
+          "val_b": 24.0
+        },
+        "WAITING_PERIOD_SPECIFIC_ILLNESS": {
+          "status_a": "FOUND",
+          "val_a": 24.0,
+          "status_b": "FOUND",
+          "val_b": 12.0
+        },
+        "INITIAL_WAITING_PERIOD": {
+          "status_a": "FOUND",
+          "val_a": 30.0,
+          "status_b": "FOUND",
+          "val_b": 30.0
+        },
+        "ROOM_RENT_LIMIT": {
+          "status_a": "FOUND",
+          "unit_a": "percent",
+          "status_b": "FOUND",
+          "unit_b": "INR",
+          "diff_contains": "different limit basis"
+        },
+        "CO_PAYMENT": {
+          "status_a": "FOUND",
+          "val_a": 10.0,
+          "status_b": "FOUND",
+          "val_b": 20.0
+        },
+        "DEDUCTIBLE": {
+          "status_a": "NOT_MENTIONED",
+          "status_b": "FOUND",
+          "val_b": 10000.0
+        },
+        "PERMANENT_EXCLUSIONS": {
+          "status_a": "FOUND",
+          "status_b": "EXPLICITLY_ABSENT"
+        },
+        "AGE_LIMIT": {
+          "status_a": "FOUND",
+          "val_a": 65.0,
+          "status_b": "FOUND",
+          "val_b": 70.0
+        }
+      }
+    }
+  ]
+}

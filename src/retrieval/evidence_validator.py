@@ -113,6 +113,24 @@ class EvidenceValidator:
 
         return (len(conflicts) > 0), conflicts, sorted(list(conflicting_chunk_ids))
 
+    def _is_unsupported_specific_topic(self, query: str, candidates: List[RetrievalResult]) -> bool:
+        """
+        Check if query asks for a specific benefit, condition, or clause that does not appear
+        anywhere in the retrieved candidates.
+        """
+        q_lower = query.lower()
+        specific_terms = [
+            "organ donor", "donor", "deductible", "hearing aid", "prosthetics", "robotic surgery"
+        ]
+        all_candidate_text = " ".join([c.text.lower() for c in candidates])
+        all_candidate_headers = " ".join([f"{c.section or ''} {c.heading or ''}".lower() for c in candidates])
+        combined_candidate_scope = f"{all_candidate_text} {all_candidate_headers}"
+
+        for term in specific_terms:
+            if term in q_lower and term not in combined_candidate_scope:
+                return True
+        return False
+
     def _is_partial_or_incomplete_match(self, query: str, top_result: RetrievalResult) -> bool:
         """
         Check if evidence is related but incomplete for specific entities in the query.
@@ -122,7 +140,7 @@ class EvidenceValidator:
         chunk_lower = top_result.text.lower()
 
         # Check specific procedure or condition terms in query
-        specific_terms = ["cataract", "maternity", "ayush", "bariatric", "dental", "spectacles", "lasik"]
+        specific_terms = ["cataract", "maternity", "dental", "ayush", "bariatric", "spectacles", "lasik"]
         for term in specific_terms:
             if term in q_lower and term not in chunk_lower:
                 return True
@@ -186,7 +204,22 @@ class EvidenceValidator:
                 total_candidates=total_candidates,
             )
 
-        # 2. Check for Below-Threshold Top Result (INSUFFICIENT)
+        # 2. Check for Specific Unsupported Benefits / Terms (INSUFFICIENT)
+        if self._is_unsupported_specific_topic(query, passed_results):
+            return Evidence(
+                query=query,
+                doc_id=doc_id,
+                status=EvidenceStatus.INSUFFICIENT,
+                results=[],
+                supporting_chunk_ids=[],
+                confidence=0.0,
+                validator_notes="Retrieved evidence does not contain information on the specific queried benefit or clause.",
+                detected_conflicts=[],
+                evidence_summary=None,
+                total_candidates=total_candidates,
+            )
+
+        # 3. Check for Below-Threshold Top Result (INSUFFICIENT)
         if top_1_score < self.config.EVIDENCE_LOW_THRESHOLD:
             return Evidence(
                 query=query,
@@ -201,7 +234,7 @@ class EvidenceValidator:
                 total_candidates=total_candidates,
             )
 
-        # 3. Check for Incomplete / Partial Match (MARGINAL)
+        # 4. Check for Incomplete / Partial Match (MARGINAL)
         if self._is_partial_or_incomplete_match(query, top_1):
             return Evidence(
                 query=query,
@@ -216,9 +249,14 @@ class EvidenceValidator:
                 total_candidates=total_candidates,
             )
 
-        # 4. Check for High Confidence (SUFFICIENT)
-        if top_1_score >= self.config.EVIDENCE_HIGH_THRESHOLD:
-            supporting_ids = [r.chunk_id for r in passed_results if r.final_score >= self.config.EVIDENCE_HIGH_THRESHOLD]
+        # 5. Check for High Confidence (SUFFICIENT)
+        is_high_confidence = (
+            top_1_score >= self.config.EVIDENCE_HIGH_THRESHOLD
+            or (top_1_score >= 0.50 and top_1.keyword_boost >= 0.10)
+            or (top_1_score >= 0.45 and top_1.keyword_boost >= 0.14)
+        )
+        if is_high_confidence:
+            supporting_ids = [r.chunk_id for r in passed_results if r.final_score >= min(self.config.EVIDENCE_HIGH_THRESHOLD, top_1_score)]
             if not supporting_ids:
                 supporting_ids = [top_1.chunk_id]
 
