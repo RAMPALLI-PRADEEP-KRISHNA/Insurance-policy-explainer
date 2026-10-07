@@ -49,6 +49,7 @@ class Embedder:
         Does nothing if already loaded.
         """
         if self._model is not None:
+            print("[TIMING] embedding model acquisition: model reused")
             return
 
         logger.info("Loading embedding model '%s' on device '%s'...", self.model_name, self.device)
@@ -62,6 +63,7 @@ class Embedder:
                 self._dimension = self._model.get_sentence_embedding_dimension()
             elapsed = time.time() - t0
             logger.info("Embedding model loaded successfully in %.2fs (dim=%d)", elapsed, self._dimension)
+            print(f"[TIMING] embedding model acquisition: model loaded in {elapsed:.4f} s")
         except Exception as e:
             logger.error("Failed to load embedding model '%s': %s", self.model_name, e)
             raise EmbeddingError(f"Could not load embedding model '{self.model_name}': {str(e)}")
@@ -160,3 +162,4 @@ class Embedder:
 
 # Singleton instance
 embedder = Embedder()
+

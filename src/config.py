@@ -53,11 +53,20 @@ class AppConfig:
     MAX_KEYWORD_BOOST: float = float(os.getenv("MAX_KEYWORD_BOOST", "0.15"))
 
 
-    # LLM Settings (Phase 4)
+    # LLM Provider Selection
+    LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "gemini").lower()
+
+    # Gemini Settings (Phase 4)
     GEMINI_API_KEY: Optional[str] = os.getenv("GEMINI_API_KEY", None)
     GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
     GEMINI_TIMEOUT_SECONDS: int = int(os.getenv("GEMINI_TIMEOUT_SECONDS", "30"))
+    LLM_REQUEST_TIMEOUT_SECONDS: int = int(os.getenv("LLM_REQUEST_TIMEOUT_SECONDS", "20"))
+    LLM_TOTAL_DEADLINE_SECONDS: int = int(os.getenv("LLM_TOTAL_DEADLINE_SECONDS", "30"))
     GEMINI_TEMPERATURE: float = float(os.getenv("GEMINI_TEMPERATURE", "0.0"))
+
+    # Mistral Settings
+    MISTRAL_API_KEY: Optional[str] = os.getenv("MISTRAL_API_KEY", None)
+    MISTRAL_MODEL: str = os.getenv("MISTRAL_MODEL", "mistral-small-latest")
     TAMIL_GENERATION_MODE: str = os.getenv("TAMIL_GENERATION_MODE", "translation")
 
 
@@ -76,3 +85,4 @@ class AppConfig:
 
 config = AppConfig()
 config.ensure_directories()
+

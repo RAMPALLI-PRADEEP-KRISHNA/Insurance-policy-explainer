@@ -116,4 +116,12 @@ class GeminiServiceUnavailableError(GenerationError):
     """Raised when Gemini API returns 503 UNAVAILABLE (transient server overload)."""
     pass
 
+class GeminiRateLimitError(GenerationError):
+    '''Raised when Gemini API returns 429.'''
+    pass
+
+class MistralRateLimitError(GenerationError):
+    """Raised when Mistral API returns 429 Quota Exceeded."""
+    pass
+
 

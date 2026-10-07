@@ -199,7 +199,7 @@ def test_answer_policy_question_missing_api_key():
     from src.generation.answer_generator import AnswerGenerator
     from src.generation.gemini_client import GeminiClient
 
-    client_without_key = GeminiClient(api_key=None, app_config=MagicMock(GEMINI_API_KEY=None, GEMINI_MODEL="gemini-2.5-flash"))
+    client_without_key = GeminiClient(api_key=None, app_config=MagicMock(GEMINI_API_KEY=None, GEMINI_MODEL="gemini-2.5-flash", LLM_TOTAL_DEADLINE_SECONDS=30, LLM_REQUEST_TIMEOUT_SECONDS=20))
     generator = AnswerGenerator(gemini_client_instance=client_without_key)
 
     chunk = Chunk(
@@ -272,3 +272,4 @@ def test_scan_policy_red_flags_ui_service(sample_pdf_bytes, tmp_path):
     assert len(report.findings) >= 6
     assert any(f.category.value == "ROOM_RENT_LIMIT" for f in report.findings)
     assert any(f.category.value == "WAITING_PERIOD" for f in report.findings)
+

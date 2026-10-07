@@ -4,6 +4,8 @@ from pathlib import Path
 from unittest.mock import MagicMock
 import pytest
 
+pytestmark = pytest.mark.live
+
 from src.app import process_uploaded_policy, answer_policy_question
 from src.ingestion.embedder import embedder
 from src.ingestion.index_store import IndexStore
@@ -195,3 +197,4 @@ def test_smoke_6_upload_second_policy_and_isolation(smoke_environment, make_text
     for c in ans_leak_check.citations:
         assert c.document_id == doc_motor.doc_id
         assert "sample_policy" not in c.filename
+

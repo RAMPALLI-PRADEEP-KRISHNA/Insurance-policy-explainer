@@ -252,6 +252,8 @@ class GroundedAnswer(BaseModel):
     confidence: float = Field(default=0.0, ge=0.0, le=1.0, description="Confidence score inherited from retrieval/evidence validation")
     detected_conflicts: List[str] = Field(default_factory=list, description="Descriptions of contradictory clauses if status == CONFLICTING")
     generation_model: Optional[str] = Field(default=None, description="Model used for generation")
+    llm_unavailable: bool = Field(default=False, description="True if LLM generation failed cleanly due to rate limit/timeout/unavailable")
+    llm_unavailable_reason: Optional[str] = Field(default=None, description="Reason for LLM unavailability")
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -391,6 +393,7 @@ class ComparisonReport(BaseModel):
 
 # Alias for backward compatibility with DATA_MODEL.md naming
 ComparisonResult = ComparisonReport
+
 
 
 

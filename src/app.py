@@ -1,5 +1,6 @@
 """Streamlit web application for Insurance Policy Explainer."""
 
+import hashlib
 import tempfile
 from pathlib import Path
 from typing import List, Optional, Tuple
@@ -45,8 +46,10 @@ from src.utils.exceptions import (
     ModelUnavailableError,
     GenerationTimeoutError,
     GeminiServiceUnavailableError,
+    MistralRateLimitError,
     IndexNotFoundError,
 )
+from src.utils.timing import timed
 from src.utils.logging_utils import get_logger
 
 logger = get_logger(__name__)
@@ -83,16 +86,20 @@ def process_uploaded_policy(
 
     try:
         # 2. Ingest & extract pages
-        document = process_pdf(temp_path, save_meta=True)
+        with timed("PDF extraction"):
+            document = process_pdf(temp_path, save_meta=True)
 
         if document.status == DocumentStatus.FAILED or document.quality == DocumentQuality.FAILED:
             return document, []
 
         # 3. Chunk document
-        chunks = chunk_document(document)
+        with timed("chunking"):
+            chunks = chunk_document(document)
 
         # 4. Check freshness or build FAISS index
-        if not store.is_fresh(document.doc_id, document.file_hash):
+        with timed("index-exists check / index load"):
+            is_fresh = store.is_fresh(document.doc_id, document.file_hash)
+        if not is_fresh:
             store.build_index(document, chunks=chunks, force_rebuild=True)
         else:
             logger.info("Reusing existing fresh index for document '%s'", document.doc_id)
@@ -138,10 +145,12 @@ def answer_policy_question(
     results = r.retrieve(doc_id=doc_id, query=query, top_k=config.RETRIEVAL_FINAL_K)
 
     # 2. Four-state evidence validation
-    evidence = v.validate(query=query, results=results, doc_id=doc_id)
+    with timed("evidence validation"):
+        evidence = v.validate(query=query, results=results, doc_id=doc_id)
 
     # 3. Grounded answer generation via Gemini (or controlled refusal on INSUFFICIENT)
-    return g.generate_answer(query=query, evidence=evidence, language=language)
+    with timed("LLM request"):
+        return g.generate_answer(query=query, evidence=evidence, language=language)
 
 
 def scan_policy_red_flags(
@@ -384,8 +393,8 @@ def main() -> None:
         st.session_state.active_chunks = []
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
-    if "uploaded_filename" not in st.session_state:
-        st.session_state.uploaded_filename = None
+    if "uploaded_file_hash" not in st.session_state:
+        st.session_state.uploaded_file_hash = None
     if "red_flag_report" not in st.session_state:
         st.session_state.red_flag_report = None
     if "comparison_report" not in st.session_state:
@@ -407,7 +416,7 @@ def main() -> None:
         )
 
         # Handle File Upload & Processing
-        if uploaded_file is not None and uploaded_file.name != st.session_state.uploaded_filename:
+        if uploaded_file is not None and hashlib.sha256(uploaded_file.getvalue()).hexdigest() != st.session_state.uploaded_file_hash:
             with st.spinner("Processing policy document and building FAISS index..."):
                 try:
                     file_bytes = uploaded_file.read()
@@ -416,7 +425,7 @@ def main() -> None:
                     # Update active document in session state (enforces strict document isolation)
                     st.session_state.active_doc = doc
                     st.session_state.active_chunks = chunks
-                    st.session_state.uploaded_filename = uploaded_file.name
+                    st.session_state.uploaded_file_hash = hashlib.sha256(uploaded_file.getvalue()).hexdigest()
                     st.session_state.chat_history = []  # Reset chat history for new policy
                     st.session_state.red_flag_report = None  # Reset report for new policy
                     st.session_state.comparison_report = None
@@ -466,7 +475,7 @@ def main() -> None:
                 st.session_state.active_doc = None
                 st.session_state.active_chunks = []
                 st.session_state.chat_history = []
-                st.session_state.uploaded_filename = None
+                st.session_state.uploaded_file_hash = None
                 st.session_state.red_flag_report = None
                 st.session_state.comparison_report = None
                 st.session_state.policy_b_doc = None
@@ -516,9 +525,15 @@ def main() -> None:
 
             with st.chat_message("assistant"):
                 grounded_ans: GroundedAnswer = chat_item["answer"]
-                render_evidence_status_badge(grounded_ans.evidence_status, grounded_ans.confidence)
-                st.markdown(grounded_ans.answer)
-                render_citations(grounded_ans.citations)
+                if getattr(grounded_ans, "llm_unavailable", False):
+                    reason = getattr(grounded_ans, "llm_unavailable_reason", "Timeout or quota exceeded")
+                    st.warning(f"Language model unavailable ({reason})")
+                    st.markdown(f"**Retrieved Sources:**\n\n{grounded_ans.answer}")
+                    render_citations(grounded_ans.citations)
+                else:
+                    render_evidence_status_badge(grounded_ans.evidence_status, grounded_ans.confidence)
+                    st.markdown(grounded_ans.answer)
+                    render_citations(grounded_ans.citations)
 
         # Chat Input Box
         query = st.chat_input("Ask a question about this policy (e.g., 'What is the waiting period for pre-existing diseases?')...")
@@ -532,15 +547,22 @@ def main() -> None:
             with st.chat_message("assistant"):
                 with st.spinner("Searching policy clauses, validating evidence, and generating grounded answer..."):
                     try:
-                        grounded_ans = answer_policy_question(
+                        with timed("Total time per question"):
+                            grounded_ans = answer_policy_question(
                             doc_id=active_doc.doc_id,
                             query=query,
                             language=selected_language,
                         )
 
-                        render_evidence_status_badge(grounded_ans.evidence_status, grounded_ans.confidence)
-                        st.markdown(grounded_ans.answer)
-                        render_citations(grounded_ans.citations)
+                        if getattr(grounded_ans, "llm_unavailable", False):
+                            reason = getattr(grounded_ans, "llm_unavailable_reason", "Timeout or quota exceeded")
+                            st.warning(f"Language model unavailable ({reason})")
+                            st.markdown(f"**Retrieved Sources:**\n\n{grounded_ans.answer}")
+                            render_citations(grounded_ans.citations)
+                        else:
+                            render_evidence_status_badge(grounded_ans.evidence_status, grounded_ans.confidence)
+                            st.markdown(grounded_ans.answer)
+                            render_citations(grounded_ans.citations)
 
                         # Append to session state chat history
                         st.session_state.chat_history.append({
@@ -567,6 +589,8 @@ def main() -> None:
                             "but an AI-generated answer could not be produced right now.\n\n"
                             "**Please try again in a moment.**"
                         )
+                    except MistralRateLimitError as e:
+                        st.warning(f"? **Mistral is temporarily unavailable.**\n\n{str(e)}")
                     except IndexNotFoundError:
                         st.error("The policy index could not be located. Please re-upload the document.")
                     except InsuranceExplainerError as e:
@@ -644,3 +668,14 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+
+
+
+
+
+
+
+
+

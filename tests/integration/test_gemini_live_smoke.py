@@ -2,6 +2,8 @@
 
 from pathlib import Path
 import pytest
+
+pytestmark = pytest.mark.live
 from src.config import config
 from src.ingestion.pdf_extractor import process_pdf
 from src.ingestion.chunker import chunk_document
@@ -75,3 +77,4 @@ def test_live_gemini_smoke_or_skip(end_to_end_system):
     if answer_mat.evidence_status == EvidenceStatus.INSUFFICIENT:
         assert answer_mat.citations == []
         assert "not find sufficient information" in answer_mat.answer
+

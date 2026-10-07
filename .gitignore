@@ -69,3 +69,4 @@ ehthumbs.db
 Desktop.ini
 $RECYCLE.BIN/
 .DS_Store
+tests/evaluation/evaluation_report.json

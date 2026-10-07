@@ -266,3 +266,68 @@ def test_tamil_answer_generation():
     assert len(answer.citations) == 1
     assert answer.citations[0].page_number == 2
     assert answer.citations[0].chunk_id == "c_ped_tamil"
+import pytest
+from unittest.mock import MagicMock
+from src.generation.answer_generator import AnswerGenerator
+from src.models.data_models import Evidence, EvidenceStatus
+from src.utils.exceptions import GeminiRateLimitError, MissingAPIKeyError, GenerationTimeoutError
+
+def test_generator_429_llm_unavailable():
+    mock_client = MagicMock()
+    mock_client.generate.side_effect = GeminiRateLimitError("Quota exceeded")
+    
+    generator = AnswerGenerator(gemini_client_instance=mock_client)
+    evidence = Evidence(
+        query="What is the waiting period?",
+        doc_id="d1",
+        status=EvidenceStatus.SUFFICIENT,
+        results=[],
+        supporting_chunk_ids=["c1"],
+        confidence=0.9,
+        evidence_summary="36 months waiting period"
+    )
+    
+    ans = generator.generate_answer("What is the waiting period?", evidence)
+    
+    assert ans.llm_unavailable is True
+    assert "Quota exceeded" in ans.llm_unavailable_reason
+    assert ans.answer == "36 months waiting period"
+    assert mock_client.generate.call_count == 1
+
+def test_generator_missing_key_raises():
+    mock_client = MagicMock()
+    mock_client.generate.side_effect = MissingAPIKeyError("No API key")
+    
+    generator = AnswerGenerator(gemini_client_instance=mock_client)
+    evidence = Evidence(
+        query="What is the waiting period?",
+        doc_id="d1",
+        status=EvidenceStatus.SUFFICIENT,
+        results=[],
+        supporting_chunk_ids=[],
+        confidence=0.9,
+        evidence_summary="36 months"
+    )
+    
+    with pytest.raises(MissingAPIKeyError):
+        generator.generate_answer("What is the waiting period?", evidence)
+
+def test_generator_no_evidence_no_llm_call():
+    mock_client = MagicMock()
+    
+    generator = AnswerGenerator(gemini_client_instance=mock_client)
+    evidence = Evidence(
+        query="What is the meaning of life?",
+        doc_id="d1",
+        status=EvidenceStatus.INSUFFICIENT,
+        results=[],
+        supporting_chunk_ids=[],
+        confidence=0.1,
+        evidence_summary=""
+    )
+    
+    ans = generator.generate_answer("What is the meaning of life?", evidence)
+    
+    assert ans.llm_unavailable is False
+    assert mock_client.generate.call_count == 0
+    assert "I could not find sufficient information" in ans.answer

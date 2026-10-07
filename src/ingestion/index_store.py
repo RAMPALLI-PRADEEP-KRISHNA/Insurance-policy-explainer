@@ -1,3 +1,4 @@
+from src.utils.timing import timed
 """Persistent, document-isolated FAISS IndexFlatIP store for insurance policy chunks."""
 
 import json
@@ -90,64 +91,66 @@ class IndexStore:
         # 3. Embed chunks
         logger.info("Building FAISS index for document '%s' (%d chunks)...", doc_id, len(doc_chunks))
         t0 = time.time()
-        vectors = self.embedder.embed_chunks(doc_chunks)
+        with timed("document embedding"):
+            vectors = self.embedder.embed_chunks(doc_chunks)
         dim = self.embedder.dimension
 
-        # 4. Construct FAISS IndexFlatIP
-        index = faiss.IndexFlatIP(dim)
-        if len(doc_chunks) > 0:
-            index.add(vectors)
+        with timed("FAISS build + persist"):
+            # 4. Construct FAISS IndexFlatIP
+                index = faiss.IndexFlatIP(dim)
+                if len(doc_chunks) > 0:
+                    index.add(vectors)
 
-        # 5. Persist index, chunks, and metadata
-        idx_dir.mkdir(parents=True, exist_ok=True)
-        faiss_path = idx_dir / "index.faiss"
-        chunks_path = idx_dir / "chunks.json"
-        meta_path = idx_dir / "metadata.json"
+                # 5. Persist index, chunks, and metadata
+                idx_dir.mkdir(parents=True, exist_ok=True)
+                faiss_path = idx_dir / "index.faiss"
+                chunks_path = idx_dir / "chunks.json"
+                meta_path = idx_dir / "metadata.json"
 
-        # Save FAISS binary index
-        try:
-            faiss.write_index(index, str(faiss_path))
-        except Exception as e:
-            logger.error("Failed to write FAISS index to %s: %s", faiss_path, e)
-            raise IndexStoreError(f"FAISS index write failed: {str(e)}")
+                # Save FAISS binary index
+                try:
+                    faiss.write_index(index, str(faiss_path))
+                except Exception as e:
+                    logger.error("Failed to write FAISS index to %s: %s", faiss_path, e)
+                    raise IndexStoreError(f"FAISS index write failed: {str(e)}")
 
-        # Save chunks JSON (exclude embeddings from chunks.json to conserve disk space)
-        try:
-            chunks_data = []
-            for c in doc_chunks:
-                c_dict = c.model_dump()
-                c_dict["embedding"] = None  # Stored in FAISS binary
-                chunks_data.append(c_dict)
-            with open(chunks_path, "w", encoding="utf-8") as f:
-                json.dump(chunks_data, f, indent=2)
-        except Exception as e:
-            logger.error("Failed to write chunks JSON to %s: %s", chunks_path, e)
-            raise IndexStoreError(f"Chunks serialization failed: {str(e)}")
+                # Save chunks JSON (exclude embeddings from chunks.json to conserve disk space)
+                try:
+                    chunks_data = []
+                    for c in doc_chunks:
+                        c_dict = c.model_dump()
+                        c_dict["embedding"] = None  # Stored in FAISS binary
+                        chunks_data.append(c_dict)
+                    with open(chunks_path, "w", encoding="utf-8") as f:
+                        json.dump(chunks_data, f, indent=2)
+                except Exception as e:
+                    logger.error("Failed to write chunks JSON to %s: %s", chunks_path, e)
+                    raise IndexStoreError(f"Chunks serialization failed: {str(e)}")
 
-        # Save metadata JSON
-        metadata = IndexMetadata(
-            document_id=doc_id,
-            filename=document.filename,
-            file_hash=document.file_hash,
-            chunk_count=len(doc_chunks),
-            embedding_model=self.embedder.model_name,
-            embedding_dimension=dim,
-            normalized=True,
-            index_type="IndexFlatIP",
-            created_at=datetime.now(timezone.utc),
-            index_schema_version=self.schema_version,
-        )
+                # Save metadata JSON
+                metadata = IndexMetadata(
+                    document_id=doc_id,
+                    filename=document.filename,
+                    file_hash=document.file_hash,
+                    chunk_count=len(doc_chunks),
+                    embedding_model=self.embedder.model_name,
+                    embedding_dimension=dim,
+                    normalized=True,
+                    index_type="IndexFlatIP",
+                    created_at=datetime.now(timezone.utc),
+                    index_schema_version=self.schema_version,
+                )
 
-        try:
-            with open(meta_path, "w", encoding="utf-8") as f:
-                f.write(metadata.model_dump_json(indent=2))
-        except Exception as e:
-            logger.error("Failed to write metadata JSON to %s: %s", meta_path, e)
-            raise IndexStoreError(f"Metadata serialization failed: {str(e)}")
+                try:
+                    with open(meta_path, "w", encoding="utf-8") as f:
+                        f.write(metadata.model_dump_json(indent=2))
+                except Exception as e:
+                    logger.error("Failed to write metadata JSON to %s: %s", meta_path, e)
+                    raise IndexStoreError(f"Metadata serialization failed: {str(e)}")
 
-        # Update cache
-        self._cache[doc_id] = (index, doc_chunks, metadata)
-        document.index_path = str(idx_dir)
+                # Update cache
+                self._cache[doc_id] = (index, doc_chunks, metadata)
+                document.index_path = str(idx_dir)
 
         elapsed = time.time() - t0
         logger.info(

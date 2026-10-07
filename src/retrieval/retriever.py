@@ -1,3 +1,4 @@
+from src.utils.timing import timed
 """Retriever module orchestrating dense vector search and keyword signal boosting."""
 
 import re
@@ -164,14 +165,16 @@ class Retriever:
 
         # 2. Embed Query (using same multilingual model & normalization)
         try:
-            q_vec = self.embedder.embed_query(clean_query)
+            with timed("query embedding"):
+                q_vec = self.embedder.embed_query(clean_query)
         except Exception as e:
             logger.error("Failed to embed query: %s", e)
             raise RetrievalError(f"Query embedding failed: {str(e)}") from e
 
         # 3. Retrieve Candidate Pool from FAISS
-        candidate_k = max(self.config.RETRIEVAL_CANDIDATE_K, final_k * 2)
-        candidates = self.index_store.search(doc_id, q_vec, top_k=candidate_k)
+        with timed("FAISS retrieval"):
+            candidate_k = max(self.config.RETRIEVAL_CANDIDATE_K, final_k * 2)
+            candidates = self.index_store.search(doc_id, q_vec, top_k=candidate_k)
 
         if not candidates:
             logger.warning("No candidate chunks retrieved for doc_id '%s'", doc_id)
@@ -214,3 +217,4 @@ class Retriever:
 
 
 retriever = Retriever()
+

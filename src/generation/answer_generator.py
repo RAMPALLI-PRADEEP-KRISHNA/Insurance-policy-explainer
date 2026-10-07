@@ -4,9 +4,11 @@ import json
 from typing import Optional
 from src.config import AppConfig, config as default_config
 from src.generation.citation_assembler import assemble_citations
+from src.generation.llm_provider import LLMProvider
 from src.generation.gemini_client import GeminiClient, gemini_client as default_gemini_client
 from src.models.data_models import Evidence, EvidenceStatus, GroundedAnswer
 from src.utils.logging_utils import get_logger
+from src.utils.exceptions import MistralRateLimitError, GeminiRateLimitError, GenerationTimeoutError, GeminiServiceUnavailableError, MissingAPIKeyError
 
 logger = get_logger(__name__)
 
@@ -32,6 +34,12 @@ CRITICAL INVARIANTS:
 3. Do NOT add new claims, legal advice, or general knowledge.
 """
 
+def get_llm_provider(config: AppConfig) -> LLMProvider:
+    provider = config.LLM_PROVIDER
+    if provider == "mistral":
+        from src.generation.mistral_client import MistralProvider
+        return MistralProvider(app_config=config)
+    return default_gemini_client
 
 class AnswerGenerator:
     """
@@ -41,11 +49,13 @@ class AnswerGenerator:
 
     def __init__(
         self,
-        gemini_client_instance: Optional[GeminiClient] = None,
+        llm_provider_instance: Optional[LLMProvider] = None,
+        gemini_client_instance: Optional[LLMProvider] = None,
         app_config: Optional[AppConfig] = None,
     ):
-        self.gemini_client = gemini_client_instance or default_gemini_client
         self.config = app_config or default_config
+        # Prefer llm_provider_instance, fallback to gemini_client_instance (for legacy tests), then get_llm_provider
+        self.llm_provider = llm_provider_instance or gemini_client_instance or get_llm_provider(self.config)
 
     def _generate_grounded_text(self, query: str, evidence: Evidence, language: str = "en") -> str:
         """Generate strictly grounded answer text via Gemini."""
@@ -63,13 +73,13 @@ class AnswerGenerator:
                 f"அறிவுறுத்தல்: மேலே உள்ள பாலிசி சான்றுகளின் அடிப்படையில் மட்டுமே தமிழில் தெளிவான, சுருக்கமான பதிலை வழங்கவும். "
                 f"எண்கள், சதவீதங்கள், கால அளவுகள் (36 months, 24 months, 10%), மற்றும் நிபந்தனைகளை துல்லியமாகப் பாதுகாக்கவும்."
             )
-            return self.gemini_client.generate(
+            return self.llm_provider.generate(
                 prompt=tamil_direct_prompt,
                 system_instruction=GROUNDED_SYSTEM_INSTRUCTION,
             )
 
         # Generate English grounded text
-        english_answer = self.gemini_client.generate(
+        english_answer = self.llm_provider.generate(
             prompt=prompt,
             system_instruction=GROUNDED_SYSTEM_INSTRUCTION,
         )
@@ -77,7 +87,7 @@ class AnswerGenerator:
         # If Tamil requested in translation mode
         if language == "ta":
             tamil_prompt = f"English Answer:\n{english_answer}\n\nTranslate to Tamil:"
-            return self.gemini_client.generate(
+            return self.llm_provider.generate(
                 prompt=tamil_prompt,
                 system_instruction=TAMIL_TRANSLATION_INSTRUCTION,
             )
@@ -181,20 +191,36 @@ class AnswerGenerator:
                 generation_model=None,
             )
 
-        # State 4: SUFFICIENT — Direct Grounded Answer via Gemini
-        answer_text = self._generate_grounded_text(query, evidence, language=clean_lang)
-
-        return GroundedAnswer(
-            query=query,
-            answer=answer_text,
-            language=clean_lang,
-            evidence_status=EvidenceStatus.SUFFICIENT,
-            citations=citations,
-            supporting_chunk_ids=evidence.supporting_chunk_ids,
-            confidence=evidence.confidence,
-            detected_conflicts=[],
-            generation_model=self.config.GEMINI_MODEL,
-        )
-
+                # State 4: SUFFICIENT - Direct Grounded Answer via Gemini
+        try:
+            answer_text = self._generate_grounded_text(query, evidence, language=clean_lang)
+            return GroundedAnswer(
+                query=query,
+                answer=answer_text,
+                language=clean_lang,
+                evidence_status=EvidenceStatus.SUFFICIENT,
+                citations=citations,
+                supporting_chunk_ids=evidence.supporting_chunk_ids,
+                confidence=evidence.confidence,
+                detected_conflicts=[],
+                generation_model=self.config.GEMINI_MODEL,
+            )
+        except (GenerationTimeoutError, GeminiServiceUnavailableError, MistralRateLimitError, GeminiRateLimitError) as e:
+            return GroundedAnswer(
+                query=query,
+                answer=evidence.evidence_summary or " ",
+                language=clean_lang,
+                evidence_status=EvidenceStatus.SUFFICIENT,
+                citations=citations,
+                supporting_chunk_ids=evidence.supporting_chunk_ids,
+                confidence=evidence.confidence,
+                detected_conflicts=[],
+                generation_model=None,
+                llm_unavailable=True,
+                llm_unavailable_reason=str(e),
+            )
 
 answer_generator = AnswerGenerator()
+
+
+

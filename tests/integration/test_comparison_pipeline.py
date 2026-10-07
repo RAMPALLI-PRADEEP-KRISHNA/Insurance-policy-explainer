@@ -4,6 +4,8 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 import pytest
 
+pytestmark = pytest.mark.live
+
 from src.app import compare_uploaded_policies, render_comparison_report
 from src.comparison.comparison_engine import compare_policies
 from src.ingestion.pdf_extractor import process_pdf
@@ -128,3 +130,4 @@ def test_render_comparison_report_mock(ingested_comparison_fixtures):
         render_comparison_report(report)
         assert mock_md.call_count >= 10
         assert mock_info.call_count >= 2
+

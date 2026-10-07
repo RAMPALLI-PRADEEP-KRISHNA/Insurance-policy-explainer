@@ -8,6 +8,7 @@ from src.utils.exceptions import (
     GenerationError,
     GenerationTimeoutError,
     GeminiServiceUnavailableError,
+    GeminiRateLimitError,
     MalformedOutputError,
     MissingAPIKeyError,
     ModelUnavailableError,
@@ -17,7 +18,7 @@ from src.utils.logging_utils import get_logger
 logger = get_logger(__name__)
 
 # Transient 503 retry policy — only for service-overload responses
-_RETRY_MAX_ATTEMPTS = 3   # 1 initial + 2 retries
+_RETRY_MAX_ATTEMPTS = 2   # 1 initial + 2 retries
 _RETRY_BASE_DELAY_S = 2.0
 
 
@@ -132,14 +133,18 @@ class GeminiClient:
             raise ValueError("Prompt cannot be empty.")
 
         temp = temperature if temperature is not None else self.config.GEMINI_TEMPERATURE
-
-        last_exception: Optional[Exception] = None
+        start_time = time.time()
+        last_err_msg = ""
 
         for attempt in range(1, _RETRY_MAX_ATTEMPTS + 1):
+            elapsed = time.time() - start_time
+            if elapsed >= self.config.LLM_TOTAL_DEADLINE_SECONDS:
+                print(f"[TIMING] LLM request - Provider: Gemini, Model: {self.model_name}, Outcome: deadline, Attempts: {attempt - 1}")
+                raise GenerationTimeoutError(f"Gemini generation timed out after {elapsed:.1f}s")
+
             try:
                 from google.genai import types
 
-                # Build config
                 config_params: dict = {
                     "temperature": temp,
                 }
@@ -162,54 +167,45 @@ class GeminiClient:
                         f"Gemini model '{self.model_name}' returned an empty or malformed response."
                     )
 
+                print(f"[TIMING] LLM request - Provider: Gemini, Model: {self.model_name}, Outcome: success, Attempts: {attempt}")
                 return response.text.strip()
 
             except (MissingAPIKeyError, MalformedOutputError, GenerationTimeoutError):
                 raise
-            except TimeoutError as e:
-                logger.error("Gemini generation timed out: %s", e)
-                raise GenerationTimeoutError(f"Gemini generation timed out after {self.config.GEMINI_TIMEOUT_SECONDS}s.") from e
             except Exception as e:
-                err_msg = str(e)
+                err_msg = str(e).lower()
+                last_err_msg = err_msg
 
-                # Never retry auth failures
                 if self._is_auth_error(err_msg):
-                    logger.error("Gemini authentication/permission failure: %s", err_msg)
+                    logger.error("Gemini authentication failure: %s", err_msg)
                     raise GenerationError(f"Gemini authentication error: {err_msg}") from e
 
-                # Never retry timeout errors
-                if "timeout" in err_msg.lower() or "deadline" in err_msg.lower():
-                    logger.error("Gemini generation timed out: %s", err_msg)
-                    raise GenerationTimeoutError(f"Gemini generation timed out: {err_msg}") from e
+                is_timeout = "timeout" in err_msg or "deadline" in err_msg
+                is_503 = self._is_transient_503(err_msg)
+                is_429 = "429" in err_msg or "resource exhausted" in err_msg or "quota" in err_msg
 
-                # Retry transient 503 UNAVAILABLE
-                if self._is_transient_503(err_msg):
-                    last_exception = e
-                    if attempt < _RETRY_MAX_ATTEMPTS:
-                        delay = _RETRY_BASE_DELAY_S * (2 ** (attempt - 1))
-                        logger.warning(
-                            "Gemini returned 503 (attempt %d/%d). Retrying in %.1fs...",
-                            attempt, _RETRY_MAX_ATTEMPTS, delay,
-                        )
-                        time.sleep(delay)
-                        continue
+                if is_429:
+                    print(f"[TIMING] LLM request - Provider: Gemini, Model: {self.model_name}, Outcome: rate_limited, Attempts: {attempt}")
+                    raise GeminiRateLimitError(f"Gemini rate limit exceeded: {err_msg}") from e
+
+                if not (is_timeout or is_503):
+                    logger.error("Gemini API call failed unrecoverably: %s", err_msg)
+                    raise GenerationError(f"Gemini generation error: {err_msg}") from e
+
+                # It is a timeout or 503. Retry if attempts left.
+                if attempt < _RETRY_MAX_ATTEMPTS:
+                    delay = min(_RETRY_BASE_DELAY_S * (2 ** (attempt - 1)), 1.0)
+                    time.sleep(delay)
+                    continue
+                else:
+                    outcome = "timeout" if is_timeout else "unavailable"
+                    print(f"[TIMING] LLM request - Provider: Gemini, Model: {self.model_name}, Outcome: {outcome}, Attempts: {attempt}")
+                    if is_timeout:
+                        raise GenerationTimeoutError(f"Gemini generation timed out: {err_msg}") from e
                     else:
-                        logger.error(
-                            "Gemini 503 UNAVAILABLE after %d attempts. Giving up.",
-                            _RETRY_MAX_ATTEMPTS,
-                        )
-                        raise GeminiServiceUnavailableError(
-                            "Gemini is temporarily unavailable due to high demand. "
-                            "Your policy was processed successfully, but an AI-generated answer "
-                            "could not be produced right now. Please try again in a moment."
-                        ) from e
+                        raise GeminiServiceUnavailableError(f"Gemini service unavailable: {err_msg}") from e
 
-                # All other errors — log and raise as GenerationError
-                logger.error("Gemini API call failed: %s", err_msg)
-                raise GenerationError(f"Gemini generation error: {err_msg}") from e
-
-        # Unreachable, but satisfies type checkers
-        raise GenerationError("Gemini generation failed after all attempts.")
+        raise GenerationError(f"Gemini generation failed: {last_err_msg}")
 
 
 gemini_client = GeminiClient()
