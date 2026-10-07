@@ -54,6 +54,12 @@ from src.utils.logging_utils import get_logger
 
 logger = get_logger(__name__)
 
+@st.cache_resource(show_spinner="Loading language model (first run only)")
+def preload_embedder():
+    from src.ingestion.embedder import embedder
+    embedder.load()
+    return embedder
+
 
 # =====================================================================
 # SERVICE FUNCTIONS (Decoupled for clean testability and UI reuse)
@@ -63,6 +69,7 @@ def process_uploaded_policy(
     file_bytes: bytes,
     filename: str,
     indexes_store: Optional[IndexStore] = None,
+    progress_callback=None,
 ) -> Tuple[Document, List[Chunk]]:
     """
     Ingest, validate quality, chunk, and index an uploaded PDF policy.
@@ -100,9 +107,10 @@ def process_uploaded_policy(
         with timed("index-exists check / index load"):
             is_fresh = store.is_fresh(document.doc_id, document.file_hash)
         if not is_fresh:
-            store.build_index(document, chunks=chunks, force_rebuild=True)
+            store.build_index(document, chunks=chunks, force_rebuild=True, progress_callback=progress_callback)
         else:
             logger.info("Reusing existing fresh index for document '%s'", document.doc_id)
+            document._just_loaded_fresh = True
 
         return document, chunks
     finally:
@@ -417,16 +425,28 @@ def main() -> None:
 
         # Handle File Upload & Processing
         if uploaded_file is not None and hashlib.sha256(uploaded_file.getvalue()).hexdigest() != st.session_state.uploaded_file_hash:
+            import time
+            t0 = time.time()
+            progress_bar = st.progress(0, text="Starting policy ingestion...")
+            
+            def on_progress(processed, total):
+                progress_bar.progress(processed / total, text=f"Embedding chunks: {processed}/{total} (Elapsed: {time.time()-t0:.1f}s)")
+
             with st.spinner("Processing policy document and building FAISS index..."):
                 try:
                     file_bytes = uploaded_file.read()
-                    doc, chunks = process_uploaded_policy(file_bytes, uploaded_file.name)
+                    doc, chunks = process_uploaded_policy(file_bytes, uploaded_file.name, progress_callback=on_progress)
 
                     # Update active document in session state (enforces strict document isolation)
                     st.session_state.active_doc = doc
                     st.session_state.active_chunks = chunks
                     st.session_state.uploaded_file_hash = hashlib.sha256(uploaded_file.getvalue()).hexdigest()
                     st.session_state.chat_history = []  # Reset chat history for new policy
+                    
+                    elapsed_total = time.time() - t0
+                    progress_bar.empty()
+                    if getattr(doc, '_just_loaded_fresh', False):
+                        st.success(f"Loaded existing index in {elapsed_total:.1f} s")
                     st.session_state.red_flag_report = None  # Reset report for new policy
                     st.session_state.comparison_report = None
                     st.session_state.policy_b_doc = None
@@ -528,7 +548,10 @@ def main() -> None:
                 if getattr(grounded_ans, "llm_unavailable", False):
                     reason = getattr(grounded_ans, "llm_unavailable_reason", "Timeout or quota exceeded")
                     st.warning(f"Language model unavailable ({reason})")
-                    st.markdown(f"**Retrieved Sources:**\n\n{grounded_ans.answer}")
+                    ans_text = grounded_ans.answer.strip()
+                    if not ans_text:
+                        ans_text = "\n\n".join(f"- {c.source_snippet}" for c in grounded_ans.citations)
+                    st.markdown(f"**Retrieved Sources:**\n\n{ans_text}")
                     render_citations(grounded_ans.citations)
                 else:
                     render_evidence_status_badge(grounded_ans.evidence_status, grounded_ans.confidence)
@@ -557,7 +580,10 @@ def main() -> None:
                         if getattr(grounded_ans, "llm_unavailable", False):
                             reason = getattr(grounded_ans, "llm_unavailable_reason", "Timeout or quota exceeded")
                             st.warning(f"Language model unavailable ({reason})")
-                            st.markdown(f"**Retrieved Sources:**\n\n{grounded_ans.answer}")
+                            ans_text = grounded_ans.answer.strip()
+                            if not ans_text:
+                                ans_text = "\n\n".join(f"- {c.source_snippet}" for c in grounded_ans.citations)
+                            st.markdown(f"**Retrieved Sources:**\n\n{ans_text}")
                             render_citations(grounded_ans.citations)
                         else:
                             render_evidence_status_badge(grounded_ans.evidence_status, grounded_ans.confidence)

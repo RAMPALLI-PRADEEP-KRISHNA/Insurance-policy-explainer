@@ -58,6 +58,7 @@ class IndexStore:
         document: Document,
         chunks: Optional[List[Chunk]] = None,
         force_rebuild: bool = False,
+        progress_callback=None,
     ) -> IndexMetadata:
         """
         Build and persist a FAISS IndexFlatIP index for a Document.
@@ -92,7 +93,17 @@ class IndexStore:
         logger.info("Building FAISS index for document '%s' (%d chunks)...", doc_id, len(doc_chunks))
         t0 = time.time()
         with timed("document embedding"):
-            vectors = self.embedder.embed_chunks(doc_chunks)
+            if progress_callback:
+                import numpy as np
+                vectors_list = []
+                bs = self.embedder.batch_size
+                for i in range(0, len(doc_chunks), bs):
+                    batch = doc_chunks[i:i + bs]
+                    vectors_list.append(self.embedder.embed_chunks(batch))
+                    progress_callback(min(i + bs, len(doc_chunks)), len(doc_chunks))
+                vectors = np.vstack(vectors_list) if vectors_list else np.empty((0, self.embedder.dimension), dtype="float32")
+            else:
+                vectors = self.embedder.embed_chunks(doc_chunks)
         dim = self.embedder.dimension
 
         with timed("FAISS build + persist"):
@@ -323,6 +334,8 @@ def build_index(
     document: Document,
     chunks: Optional[List[Chunk]] = None,
     force_rebuild: bool = False,
+        progress_callback=None,
 ) -> IndexMetadata:
     """Convenience functional interface for building a FAISS index."""
     return index_store.build_index(document, chunks=chunks, force_rebuild=force_rebuild)
+

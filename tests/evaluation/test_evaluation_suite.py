@@ -72,3 +72,5 @@ def test_ocr_failure_path_controlled(evaluation_results):
     summary = evaluation_results["summary"]
     assert summary["ocr_failure_controlled"] is True
 
+
+

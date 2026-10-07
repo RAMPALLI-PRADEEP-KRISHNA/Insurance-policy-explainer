@@ -110,3 +110,19 @@ def test_model_lookup_failure_raises_model_unavailable():
     client = GeminiClient(api_key="fake-key", model_name="made-up-model", client_instance=mock_sdk)
     with pytest.raises(ModelUnavailableError, match="unavailable or invalid"):
         client.validate_model()
+
+
+def test_is_transient_503_classifier():
+    client = GeminiClient(api_key='fake')
+    assert client._is_transient_503('503 unavailable') is True
+    assert client._is_transient_503('503 service unavailable') is True
+    assert client._is_transient_503('500 internal error') is False
+
+def test_is_auth_error_classifier():
+    client = GeminiClient(api_key='fake')
+    assert client._is_auth_error('401 unauthenticated') is True
+    assert client._is_auth_error('403 permission denied') is True
+    assert client._is_auth_error('invalid api_key') is True
+    assert client._is_auth_error('404 not found') is False
+
+

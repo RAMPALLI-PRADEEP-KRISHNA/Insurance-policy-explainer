@@ -4,8 +4,6 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 import pytest
 
-pytestmark = pytest.mark.live
-
 from src.app import scan_policy_red_flags, render_red_flags
 from src.ingestion.pdf_extractor import process_pdf
 from src.ingestion.chunker import chunk_document
@@ -123,4 +121,5 @@ def test_render_red_flags_streamlit_mock(sample_policy_doc_and_chunks):
         render_red_flags(report)
         assert mock_md.call_count >= 5
         assert mock_caption.call_count >= 1
+
 
