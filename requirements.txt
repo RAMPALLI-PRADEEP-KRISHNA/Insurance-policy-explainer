@@ -1,22 +1,18 @@
-# Phase 1: Core Document Ingestion & Validation
-pymupdf>=1.24.0
-Pillow>=10.0.0
-pytesseract>=0.3.10
-pydantic>=2.5.0
-python-dotenv>=1.0.0
-
-# Phase 2B: Multilingual Embeddings & Vector Search
-sentence-transformers>=3.0.0
-faiss-cpu>=1.8.0
-
-# Phase 4: Grounded LLM Generation (Modern SDK)
-google-genai>=2.0.0
-
-# Phase 5: Streamlit Web UI
-streamlit>=1.30.0
-
-# Testing
-pytest>=8.0.0
-pytest-cov>=5.0.0
-
-
+# Pinned versions from verified environment
+numpy==1.26.4
+scikit-learn==1.4.0
+scipy==1.17.1
+torch==2.14.1
+transformers==5.19.0
+sentence-transformers==6.1.0
+faiss-cpu==1.15.1
+pymupdf==1.28.2
+streamlit==1.65.0
+pydantic==2.13.5
+python-dotenv==1.2.4
+Pillow==12.3.0
+pytesseract==0.3.13
+google-genai==2.29.0
+pytest==9.1.1
+pytest-cov==7.1.0
+psutil==6.1.1

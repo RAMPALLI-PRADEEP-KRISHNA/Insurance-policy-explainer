@@ -9,6 +9,10 @@ from tests.evaluation.evaluation_runner import EvaluationRunner
 
 @pytest.fixture(scope="module")
 def evaluation_results():
+    from src.config import config
+    config.LLM_PROVIDER = "fake"
+    import os
+    os.environ.pop("GEMINI_API_KEY", None)
     """Run full deterministic evaluation suite."""
     cases_file = Path("tests/evaluation/evaluation_cases.json")
     assert cases_file.is_file(), "evaluation_cases.json missing"
@@ -71,6 +75,7 @@ def test_ocr_failure_path_controlled(evaluation_results):
     """Verify scanned PDF failure path is graceful and non-silent."""
     summary = evaluation_results["summary"]
     assert summary["ocr_failure_controlled"] is True
+
 
 
 
