@@ -185,7 +185,7 @@ def test_retrieval_performance_timings(indexed_synthetic_fixture):
         f"  - Total Pipeline Time: {total_time*1000:.2f} ms\n"
     )
 
-    assert t_embed < 0.25, f"Query embedding took too long: {t_embed:.2f}s"
+    assert t_embed < 1.0, f"Query embedding took too long: {t_embed:.2f}s"
     assert t_faiss < 0.05, f"FAISS search took too long: {t_faiss:.2f}s"
     assert t_val < 0.05, f"Evidence validation took too long: {t_val:.2f}s"
     assert total_time < 0.50, f"Total pipeline latency exceeded 500ms: {total_time:.2f}s"

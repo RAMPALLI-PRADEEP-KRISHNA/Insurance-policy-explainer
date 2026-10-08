@@ -1,9 +1,3 @@
-import sys
-import types
-fast = types.ModuleType('sklearn.metrics.cluster._expected_mutual_info_fast')
-fast.expected_mutual_information = lambda *args: 0.0
-sys.modules['sklearn.metrics.cluster._expected_mutual_info_fast'] = fast
-
 """Pytest configuration and synthetic PDF fixture generators."""
 
 import io
@@ -94,3 +88,15 @@ def make_scanned_image_pdf():
         return pdf_bytes
     return _create
 
+
+
+import os
+
+@pytest.fixture(autouse=True)
+def disable_llm_for_tests(request, monkeypatch):
+    if "live" not in request.node.keywords:
+        monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+        monkeypatch.delenv("MISTRAL_API_KEY", raising=False)
+        monkeypatch.setenv("LLM_PROVIDER", "fake")
+        from src.config import config
+        monkeypatch.setattr(config, "LLM_PROVIDER", "fake")

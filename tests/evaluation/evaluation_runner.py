@@ -57,15 +57,14 @@ class EvaluationRunner:
         self.chunks_cache: Dict[str, List[Chunk]] = {}
 
         # Set up generator with mock if live key not available
-        self.has_live_gemini = bool(os.getenv("GEMINI_API_KEY"))
-        if self.has_live_gemini:
-            self.generator = AnswerGenerator()
-        else:
+        if config.LLM_PROVIDER == "fake":
             mock_client = MagicMock(spec=GeminiClient)
             mock_client.generate.return_value = (
                 "Based on the policy terms, the applicable limit is clearly specified in Section 2."
             )
             self.generator = AnswerGenerator(gemini_client_instance=mock_client)
+        else:
+            self.generator = AnswerGenerator()
 
     def load_document(self, fixture_path: str) -> Tuple[Document, List[Chunk]]:
         """Ingest, chunk, and index a PDF fixture if not already cached."""
@@ -341,7 +340,7 @@ class EvaluationRunner:
             "comparison_isolation_verified": comp_metrics["isolation_verified"],
             "risk_scanner_status": scanner_metrics["status"],
             "ocr_failure_controlled": ocr_metrics["controlled_handling"],
-            "live_gemini_tested": self.has_live_gemini,
+            "live_gemini_tested": config.LLM_PROVIDER != "fake",
         }
 
         report = {
