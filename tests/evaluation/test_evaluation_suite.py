@@ -3,7 +3,7 @@
 from pathlib import Path
 import pytest
 
-pytestmark = pytest.mark.live
+
 from tests.evaluation.evaluation_runner import EvaluationRunner
 
 
@@ -71,6 +71,7 @@ def test_ocr_failure_path_controlled(evaluation_results):
     """Verify scanned PDF failure path is graceful and non-silent."""
     summary = evaluation_results["summary"]
     assert summary["ocr_failure_controlled"] is True
+
 
 
 

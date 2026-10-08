@@ -304,6 +304,7 @@ class IndexStore:
                 meta.file_hash == file_hash
                 and meta.index_schema_version == self.schema_version
                 and meta.embedding_dimension == self.embedder.dimension
+                and meta.embedding_model == self.embedder.model_name
             )
         except Exception:
             return False
@@ -338,4 +339,5 @@ def build_index(
 ) -> IndexMetadata:
     """Convenience functional interface for building a FAISS index."""
     return index_store.build_index(document, chunks=chunks, force_rebuild=force_rebuild)
+
 

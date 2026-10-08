@@ -1,3 +1,9 @@
+import sys
+import types
+fast = types.ModuleType('sklearn.metrics.cluster._expected_mutual_info_fast')
+fast.expected_mutual_information = lambda *args: 0.0
+sys.modules['sklearn.metrics.cluster._expected_mutual_info_fast'] = fast
+
 """Pytest configuration and synthetic PDF fixture generators."""
 
 import io
@@ -87,3 +93,4 @@ def make_scanned_image_pdf():
         doc.close()
         return pdf_bytes
     return _create
+

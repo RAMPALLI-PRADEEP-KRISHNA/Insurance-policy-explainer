@@ -54,6 +54,15 @@ from src.utils.logging_utils import get_logger
 
 logger = get_logger(__name__)
 
+class ProcessResult(tuple):
+    def __new__(cls, document, chunks, cache_hit, elapsed_seconds):
+        return super().__new__(cls, (document, chunks))
+
+    def __init__(self, document, chunks, cache_hit, elapsed_seconds):
+        self.cache_hit = cache_hit
+        self.elapsed_seconds = elapsed_seconds
+
+
 @st.cache_resource(show_spinner="Loading language model (first run only)")
 def preload_embedder():
     from src.ingestion.embedder import embedder
@@ -70,51 +79,57 @@ def process_uploaded_policy(
     filename: str,
     indexes_store: Optional[IndexStore] = None,
     progress_callback=None,
-) -> Tuple[Document, List[Chunk]]:
-    """
-    Ingest, validate quality, chunk, and index an uploaded PDF policy.
-    Reuses existing index if the document hash is fresh.
-
-    Args:
-        file_bytes: Raw bytes of the uploaded PDF file.
-        filename: Name of the uploaded file.
-        indexes_store: Optional IndexStore instance (defaults to singleton).
-
-    Returns:
-        Tuple of (Document, List[Chunk])
-    """
+) -> ProcessResult:
+    import time
+    t0 = time.time()
     store = indexes_store or index_store
+    
+    file_hash = hashlib.sha256(file_bytes).hexdigest()
+    
+    # 1. Fast path cache check
+    if store.is_fresh(file_hash, file_hash):
+        try:
+            _, chunks, meta = store.load_index(file_hash)
+            page_count = max((c.page_number for c in chunks), default=1) if chunks else 1
+            from datetime import datetime, timezone
+            doc = Document(
+                doc_id=file_hash,
+                filename=meta.filename,
+                file_hash=meta.file_hash,
+                page_count=page_count,
+                chunk_count=meta.chunk_count,
+                status=DocumentStatus.READY,
+                quality=DocumentQuality.GOOD
+            )
+            elapsed = time.time() - t0
+            return ProcessResult(doc, chunks, True, elapsed)
+        except Exception as e:
+            logger.warning("Cache valid but failed to load, falling back to full rebuild: %s", e)
 
-    # 1. Save temporarily to disk for PyMuPDF processing
+    # 2. Full pipeline
     temp_dir = Path(tempfile.gettempdir()) / "insurance_explainer_uploads"
     temp_dir.mkdir(parents=True, exist_ok=True)
     temp_path = temp_dir / filename
     temp_path.write_bytes(file_bytes)
-
+    
     try:
-        # 2. Ingest & extract pages
         with timed("PDF extraction"):
             document = process_pdf(temp_path, save_meta=True)
-
+            # Override doc_id to match hash for deterministic index caching
+            document.doc_id = file_hash
+            document.file_hash = file_hash
         if document.status == DocumentStatus.FAILED or document.quality == DocumentQuality.FAILED:
-            return document, []
-
-        # 3. Chunk document
+            return ProcessResult(document, [], False, time.time() - t0)
+            
         with timed("chunking"):
             chunks = chunk_document(document)
-
-        # 4. Check freshness or build FAISS index
-        with timed("index-exists check / index load"):
-            is_fresh = store.is_fresh(document.doc_id, document.file_hash)
-        if not is_fresh:
+            
+        with timed("FAISS build + persist"):
             store.build_index(document, chunks=chunks, force_rebuild=True, progress_callback=progress_callback)
-        else:
-            logger.info("Reusing existing fresh index for document '%s'", document.doc_id)
-            document._just_loaded_fresh = True
-
-        return document, chunks
+            
+        elapsed = time.time() - t0
+        return ProcessResult(document, chunks, False, elapsed)
     finally:
-        # Clean up temporary upload file if desired
         if temp_path.exists():
             try:
                 temp_path.unlink()
@@ -435,7 +450,8 @@ def main() -> None:
             with st.spinner("Processing policy document and building FAISS index..."):
                 try:
                     file_bytes = uploaded_file.read()
-                    doc, chunks = process_uploaded_policy(file_bytes, uploaded_file.name, progress_callback=on_progress)
+                    res = process_uploaded_policy(file_bytes, uploaded_file.name, progress_callback=on_progress)
+                    doc, chunks = res
 
                     # Update active document in session state (enforces strict document isolation)
                     st.session_state.active_doc = doc
@@ -443,10 +459,9 @@ def main() -> None:
                     st.session_state.uploaded_file_hash = hashlib.sha256(uploaded_file.getvalue()).hexdigest()
                     st.session_state.chat_history = []  # Reset chat history for new policy
                     
-                    elapsed_total = time.time() - t0
                     progress_bar.empty()
-                    if getattr(doc, '_just_loaded_fresh', False):
-                        st.success(f"Loaded existing index in {elapsed_total:.1f} s")
+                    if res.cache_hit:
+                        st.success(f"Loaded existing index in {res.elapsed_seconds:.2f} s")
                     st.session_state.red_flag_report = None  # Reset report for new policy
                     st.session_state.comparison_report = None
                     st.session_state.policy_b_doc = None
@@ -667,7 +682,8 @@ def main() -> None:
             with st.spinner("Processing Policy B and running grounded side-by-side comparison..."):
                 try:
                     file_b_bytes = uploaded_file_b.read()
-                    doc_b, chunks_b = process_uploaded_policy(file_b_bytes, uploaded_file_b.name)
+                    res_b = process_uploaded_policy(file_b_bytes, uploaded_file_b.name)
+                    doc_b, chunks_b = res_b
                     st.session_state.policy_b_doc = doc_b
                     st.session_state.policy_b_chunks = chunks_b
 
