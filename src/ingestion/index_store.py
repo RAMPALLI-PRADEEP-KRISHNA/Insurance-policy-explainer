@@ -45,6 +45,36 @@ class IndexStore:
         """Return the directory path for a specific document's index."""
         return self.indexes_dir / document_id
 
+
+    def cleanup_invalid_folders(self) -> tuple[int, int]:
+        if not self.indexes_dir.exists():
+            return 0, 0
+        import re, shutil
+        folders = list(self.indexes_dir.iterdir())
+        before = len(folders)
+        for item in folders:
+            if item.is_dir() and not re.match(r'^[a-f0-9]{64}$', item.name):
+                shutil.rmtree(item)
+        after = len(list(self.indexes_dir.iterdir()))
+        return before, after
+
+    def enforce_index_limit(self, max_indexes: int = 20) -> None:
+        if not self.indexes_dir.exists():
+            return
+        import re, shutil
+        valid_folders = []
+        for item in self.indexes_dir.iterdir():
+            if item.is_dir() and re.match(r'^[a-f0-9]{64}$', item.name):
+                meta_path = item / "metadata.json"
+                if meta_path.exists():
+                    valid_folders.append((meta_path.stat().st_mtime, item))
+                else:
+                    shutil.rmtree(item)
+        valid_folders.sort()
+        if len(valid_folders) > max_indexes:
+            for _, item in valid_folders[:-max_indexes]:
+                shutil.rmtree(item)
+
     def index_exists(self, document_id: str) -> bool:
         """Check if index files exist for a document."""
         idx_dir = self.get_index_dir(document_id)
