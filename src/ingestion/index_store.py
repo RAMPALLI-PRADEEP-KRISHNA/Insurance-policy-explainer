@@ -7,7 +7,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Tuple, Optional, Dict, Any
 import numpy as np
-import faiss
 
 from src.config import config
 from src.models.data_models import Document, Chunk, IndexMetadata
@@ -38,8 +37,8 @@ class IndexStore:
         self.indexes_dir = indexes_dir
         self.embedder = embedder_instance or embedder
         self.schema_version = schema_version
-        # In-memory cache: doc_id -> (faiss.Index, List[Chunk], IndexMetadata)
-        self._cache: Dict[str, Tuple[faiss.Index, List[Chunk], IndexMetadata]] = {}
+        # In-memory cache: doc_id -> (np.ndarray, List[Chunk], IndexMetadata)
+        self._cache: Dict[str, Tuple[np.ndarray, List[Chunk], IndexMetadata]] = {}
 
     def get_index_dir(self, document_id: str) -> Path:
         """Return the directory path for a specific document's index."""
@@ -78,10 +77,10 @@ class IndexStore:
     def index_exists(self, document_id: str) -> bool:
         """Check if index files exist for a document."""
         idx_dir = self.get_index_dir(document_id)
-        faiss_file = idx_dir / "index.faiss"
+        npy_file = idx_dir / "index.npy"
         chunks_file = idx_dir / "chunks.json"
         meta_file = idx_dir / "metadata.json"
-        return faiss_file.is_file() and chunks_file.is_file() and meta_file.is_file()
+        return npy_file.is_file() and chunks_file.is_file() and meta_file.is_file()
 
     def build_index(
         self,
@@ -91,7 +90,7 @@ class IndexStore:
         progress_callback=None,
     ) -> IndexMetadata:
         """
-        Build and persist a FAISS IndexFlatIP index for a Document.
+        Build and persist a NumPy index for a Document.
 
         Args:
             document: Canonical Document instance
@@ -120,11 +119,10 @@ class IndexStore:
                 logger.warning("Could not validate existing index for '%s' (%s). Rebuilding...", doc_id, e)
 
         # 3. Embed chunks
-        logger.info("Building FAISS index for document '%s' (%d chunks)...", doc_id, len(doc_chunks))
+        logger.info("Building NumPy index for document '%s' (%d chunks)...", doc_id, len(doc_chunks))
         t0 = time.time()
         with timed("document embedding"):
             if progress_callback:
-                import numpy as np
                 vectors_list = []
                 bs = self.embedder.batch_size
                 for i in range(0, len(doc_chunks), bs):
@@ -136,62 +134,66 @@ class IndexStore:
                 vectors = self.embedder.embed_chunks(doc_chunks)
         dim = self.embedder.dimension
 
-        with timed("FAISS build + persist"):
-            # 4. Construct FAISS IndexFlatIP
-                index = faiss.IndexFlatIP(dim)
-                if len(doc_chunks) > 0:
-                    index.add(vectors)
+        with timed("NumPy build + persist"):
+            # 4. Construct NumPy Index
+            if len(doc_chunks) > 0:
+                norms = np.linalg.norm(vectors, axis=1, keepdims=True)
+                norms[norms == 0] = 1.0
+                vectors = vectors / norms
+                index = np.asarray(vectors, dtype=np.float32)
+            else:
+                index = np.empty((0, dim), dtype=np.float32)
 
-                # 5. Persist index, chunks, and metadata
-                idx_dir.mkdir(parents=True, exist_ok=True)
-                faiss_path = idx_dir / "index.faiss"
-                chunks_path = idx_dir / "chunks.json"
-                meta_path = idx_dir / "metadata.json"
+            # 5. Persist index, chunks, and metadata
+            idx_dir.mkdir(parents=True, exist_ok=True)
+            npy_path = idx_dir / "index.npy"
+            chunks_path = idx_dir / "chunks.json"
+            meta_path = idx_dir / "metadata.json"
 
-                # Save FAISS binary index
-                try:
-                    faiss.write_index(index, str(faiss_path))
-                except Exception as e:
-                    logger.error("Failed to write FAISS index to %s: %s", faiss_path, e)
-                    raise IndexStoreError(f"FAISS index write failed: {str(e)}")
+            # Save NumPy binary index
+            try:
+                np.save(str(npy_path), index)
+            except Exception as e:
+                logger.error("Failed to write NumPy index to %s: %s", npy_path, e)
+                raise IndexStoreError(f"NumPy index write failed: {str(e)}")
 
-                # Save chunks JSON (exclude embeddings from chunks.json to conserve disk space)
-                try:
-                    chunks_data = []
-                    for c in doc_chunks:
-                        c_dict = c.model_dump()
-                        c_dict["embedding"] = None  # Stored in FAISS binary
-                        chunks_data.append(c_dict)
-                    with open(chunks_path, "w", encoding="utf-8") as f:
-                        json.dump(chunks_data, f, indent=2)
-                except Exception as e:
-                    logger.error("Failed to write chunks JSON to %s: %s", chunks_path, e)
-                    raise IndexStoreError(f"Chunks serialization failed: {str(e)}")
+            # Save chunks JSON
+            try:
+                chunks_data = []
+                for c in doc_chunks:
+                    c_dict = c.model_dump()
+                    c_dict["embedding"] = None  # Stored in NumPy binary
+                    chunks_data.append(c_dict)
+                with open(chunks_path, "w", encoding="utf-8") as f:
+                    json.dump(chunks_data, f, indent=2)
+            except Exception as e:
+                logger.error("Failed to write chunks JSON to %s: %s", chunks_path, e)
+                raise IndexStoreError(f"Chunks serialization failed: {str(e)}")
 
-                # Save metadata JSON
-                metadata = IndexMetadata(
-                    document_id=doc_id,
-                    filename=document.filename,
-                    file_hash=document.file_hash,
-                    chunk_count=len(doc_chunks),
-                    embedding_model=self.embedder.model_name,
-                    embedding_dimension=dim,
-                    normalized=True,
-                    index_type="IndexFlatIP",
-                    created_at=datetime.now(timezone.utc),
-                    index_schema_version=self.schema_version,
-                )
+            # Save metadata JSON
+            metadata = IndexMetadata(
+                document_id=doc_id,
+                filename=document.filename,
+                file_hash=document.file_hash,
+                chunk_count=len(doc_chunks),
+                embedding_model=self.embedder.model_name,
+                embedding_dimension=dim,
+                normalized=True,
+                index_type="numpy_flat_ip",
+                created_at=datetime.now(timezone.utc),
+                index_schema_version=self.schema_version,
+            )
 
-                try:
-                    with open(meta_path, "w", encoding="utf-8") as f:
-                        f.write(metadata.model_dump_json(indent=2))
-                except Exception as e:
-                    logger.error("Failed to write metadata JSON to %s: %s", meta_path, e)
-                    raise IndexStoreError(f"Metadata serialization failed: {str(e)}")
+            try:
+                with open(meta_path, "w", encoding="utf-8") as f:
+                    f.write(metadata.model_dump_json(indent=2))
+            except Exception as e:
+                logger.error("Failed to write metadata JSON to %s: %s", meta_path, e)
+                raise IndexStoreError(f"Metadata serialization failed: {str(e)}")
 
-                # Update cache
-                self._cache[doc_id] = (index, doc_chunks, metadata)
-                document.index_path = str(idx_dir)
+            # Update cache
+            self._cache[doc_id] = (index, doc_chunks, metadata)
+            document.index_path = str(idx_dir)
 
         elapsed = time.time() - t0
         logger.info(
@@ -206,7 +208,7 @@ class IndexStore:
     def load_index(
         self,
         document_id: str,
-    ) -> Tuple[faiss.Index, List[Chunk], IndexMetadata]:
+    ) -> Tuple[np.ndarray, List[Chunk], IndexMetadata]:
         """
         Load index, chunks, and metadata for a document into memory.
         Uses in-memory cache if already loaded.
@@ -221,7 +223,7 @@ class IndexStore:
         if not self.index_exists(document_id):
             raise IndexNotFoundError(f"No FAISS index found for document ID '{document_id}' at {idx_dir}")
 
-        faiss_path = idx_dir / "index.faiss"
+        npy_path = idx_dir / "index.npy"
         chunks_path = idx_dir / "chunks.json"
         meta_path = idx_dir / "metadata.json"
 
@@ -240,11 +242,11 @@ class IndexStore:
                 f"expected {self.schema_version}, found {metadata.index_schema_version}"
             )
 
-        # 3. Load FAISS index
+        # 3. Load NumPy index
         try:
-            index = faiss.read_index(str(faiss_path))
+            index = np.load(str(npy_path))
         except Exception as e:
-            raise CorruptedIndexError(f"Corrupted FAISS index at {faiss_path}: {str(e)}")
+            raise CorruptedIndexError(f"Corrupted NumPy index at {npy_path}: {str(e)}")
 
         # 4. Load chunks
         try:
@@ -255,9 +257,9 @@ class IndexStore:
             raise CorruptedIndexError(f"Corrupted chunks JSON at {chunks_path}: {str(e)}")
 
         # Validate vector-chunk count alignment
-        if index.ntotal != len(chunks):
+        if index.shape[0] != len(chunks):
             raise CorruptedIndexError(
-                f"Index vector count ({index.ntotal}) does not match chunk count ({len(chunks)})"
+                f"Index vector count ({index.shape[0]}) does not match chunk count ({len(chunks)})"
             )
 
         self._cache[document_id] = (index, chunks, metadata)
@@ -282,7 +284,7 @@ class IndexStore:
         """
         index, chunks, metadata = self.load_index(document_id)
 
-        if len(chunks) == 0 or index.ntotal == 0:
+        if len(chunks) == 0 or index.shape[0] == 0:
             return []
 
         # Ensure query_vector is 2D float32 contiguous array
@@ -292,9 +294,9 @@ class IndexStore:
         q_vec = np.ascontiguousarray(q_vec)
 
         # Verify dimension
-        if q_vec.shape[1] != index.d:
+        if q_vec.shape[1] != index.shape[1]:
             raise IndexStoreError(
-                f"Query vector dimension ({q_vec.shape[1]}) does not match index dimension ({index.d})"
+                f"Query vector dimension ({q_vec.shape[1]}) does not match index dimension ({index.shape[1]})"
             )
 
         # Normalize query vector if not unit norm
@@ -302,13 +304,19 @@ class IndexStore:
         if norm > 0 and not np.isclose(norm, 1.0, atol=1e-3):
             q_vec = q_vec / norm
 
-        k = min(top_k, index.ntotal)
-        scores, indices = index.search(q_vec, k)
+        k = min(top_k, index.shape[0])
+        scores = index @ q_vec[0]
+        
+        if len(scores) <= k:
+            indices = np.argsort(scores)[::-1]
+        else:
+            indices = np.argpartition(scores, -k)[-k:]
+            indices = indices[np.argsort(scores[indices])[::-1]]
 
         results: List[Tuple[Chunk, float]] = []
-        for score, idx in zip(scores[0], indices[0]):
+        for idx in indices:
             if 0 <= idx < len(chunks):
-                results.append((chunks[idx], float(score)))
+                results.append((chunks[idx], float(scores[idx])))
 
         return results
 

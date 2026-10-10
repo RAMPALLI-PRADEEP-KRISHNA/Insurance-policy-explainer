@@ -1,0 +1,22 @@
+question,language,expected_pages,answerable,evidence_quote,quote_verified
+Will my past illnesses be covered immediately or is there a waiting period?,en,9,true,until the expiry of 36 months,true
+Is there a waiting time right after I buy the policy for general illnesses?,en,9,true,within 30 days from the first policy commencement date,true
+What exactly does a specific waiting period mean?,en,5,true,Specific waiting period means a period up to 36 months,true
+How are the room and boarding expenses defined?,en,5,true,amount charged by a Hospital towards Room and Boarding expenses,true
+Do I have to pay a percentage of the claim out of pocket?,en,5,true,bear a specified percentage of the admissible claims amount,true
+What is the maximum amount the insurance company will pay in a year?,en,6,true,amount specified as Sum Insured at the inception of a Policy Year,true
+Are pregnancy and childbirth expenses covered under this policy?,en,10,true,Medical treatment expenses traceable to childbirth,true
+How many days do I have to submit my claim papers after getting discharged?,en,19,true,claim documents not later than 30 days,true
+What happens if I get admitted to a network hospital but do not use the cashless facility?,en,19,true,cashless facility is not availed,true
+Does this policy have specific conditions that are permanently excluded from coverage?,en,11,true,Specific Exclusions,true
+Do I need to disclose changes in my health before renewing or reinstating the policy?,en,17,true,reinstatement of the contract,true
+Do I get any continuity benefits like a bonus if I don't make claims?,en,14,true,continuity benefits such as cumulative bonus,true
+Can I transfer the credits for waiting periods from another insurer?,en,4,true,"transfer the credits gained for, pre-existing diseases and specific waiting periods",true
+Is the free look cancellation period available every time I renew?,en,15,true,The Free Look Period shall be applicable at the inception of the Policy and not on renewals,true
+Does the policy pay for the ambulance ride to the hospital?,en,8,true,Expenses incurred on road Ambulance subject to a maximum of Rs.1000,true
+எனது கடந்த கால நோய்களுக்கு உடனடியாக காப்பீடு கிடைக்குமா அல்லது காத்திருப்பு காலம் உள்ளதா?,ta,9,true,until the expiry of 36 months,true
+மருத்துவமனை அறை மற்றும் உணவு செலவுகள் எவ்வாறு வரையறுக்கப்படுகின்றன?,ta,5,true,amount charged by a Hospital towards Room and Boarding expenses,true
+மருத்துவமனைக்குச் செல்லும் ஆம்புலன்ஸ் கட்டணத்தை இந்த பாலிசி வழங்குமா?,ta,8,true,Expenses incurred on road Ambulance subject to a maximum of Rs.1000,true
+Is laser eye surgery (LASIK) for vision correction covered?,en,,false,,true
+Does this policy cover veterinary bills for my pet dog?,en,,false,,true
+Can I claim expenses if I get treated in a hospital outside India?,en,,false,,true

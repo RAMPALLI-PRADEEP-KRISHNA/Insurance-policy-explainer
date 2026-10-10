@@ -15,7 +15,7 @@ def test_end_to_end_embedding_and_faiss_smoke_test(tmp_path):
     Verify complete pipeline from synthetic PDF to searchable FAISS index:
     1. Ingestion: PDF -> Pages
     2. Chunking: Pages -> Chunks (with tables and clauses)
-    3. Indexing: Chunks -> Embeddings -> FAISS IndexFlatIP
+    3. Indexing: Chunks -> Embeddings -> FAISS numpy_flat_ip
     4. Search: Retrieves the expected pre-existing disease waiting period chunk
     """
     fixture_path = Path("tests/fixtures/sample_policy_fixture.pdf")

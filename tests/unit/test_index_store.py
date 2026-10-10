@@ -61,7 +61,7 @@ def test_build_and_search_index(temp_index_store):
     assert meta.document_id == "doc-001"
     assert meta.chunk_count == 3
     assert meta.embedding_dimension == 768
-    assert meta.index_type == "IndexFlatIP"
+    assert meta.index_type == "numpy_flat_ip"
 
     # Search for waiting period
     q_vec = embedder.embed_query("How many months is the waiting period?")
@@ -83,7 +83,7 @@ def test_index_persistence_and_reload(temp_index_store):
 
     # Verify physical files exist
     idx_dir = temp_index_store.get_index_dir("doc-002")
-    assert (idx_dir / "index.faiss").is_file()
+    assert (idx_dir / "index.npy").is_file()
     assert (idx_dir / "chunks.json").is_file()
     assert (idx_dir / "metadata.json").is_file()
 
