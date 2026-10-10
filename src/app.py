@@ -6,6 +6,10 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 import streamlit as st
 
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 from src.config import config
 from src.generation.answer_generator import answer_generator, AnswerGenerator
 from src.ingestion.chunker import chunk_document
