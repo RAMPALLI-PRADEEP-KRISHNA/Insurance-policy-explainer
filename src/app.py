@@ -575,6 +575,9 @@ def main() -> None:
                 else:
                     render_evidence_status_badge(grounded_ans.evidence_status, grounded_ans.confidence)
                     st.markdown(grounded_ans.answer)
+                    model = getattr(grounded_ans, "generation_model", "")
+                    if model and "gemini" in model.lower() and config.LLM_PROVIDER == "mistral":
+                        st.caption("Answered by Gemini (Mistral was unavailable)")
                     render_citations(grounded_ans.citations)
 
         # Chat Input Box
@@ -607,6 +610,9 @@ def main() -> None:
                         else:
                             render_evidence_status_badge(grounded_ans.evidence_status, grounded_ans.confidence)
                             st.markdown(grounded_ans.answer)
+                            model = getattr(grounded_ans, "generation_model", "")
+                            if model and "gemini" in model.lower() and config.LLM_PROVIDER == "mistral":
+                                st.caption("Answered by Gemini (Mistral was unavailable)")
                             render_citations(grounded_ans.citations)
 
                         # Append to session state chat history
@@ -619,7 +625,7 @@ def main() -> None:
                     except MissingAPIKeyError:
                         st.warning(
                             "⚠️ **Gemini API key is not configured.**\n\n"
-                            "To generate AI answers, please configure `GEMINI_API_KEY` in your `.env` file. "
+                            "To generate AI answers, please configure `MISTRAL_API_KEY` (and optionally `GEMINI_API_KEY`) in your `.env` file. "
                             "Retrieval and evidence validation are fully operational."
                         )
                     except ModelUnavailableError as e:

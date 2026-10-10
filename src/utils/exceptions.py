@@ -125,3 +125,10 @@ class MistralRateLimitError(GenerationError):
     pass
 
 
+
+class MistralServiceUnavailableError(GenerationError):
+    pass
+
+class MistralAuthError(GenerationError):
+    pass
+

@@ -8,7 +8,7 @@ from src.generation.llm_provider import LLMProvider
 from src.generation.gemini_client import GeminiClient, gemini_client as default_gemini_client
 from src.models.data_models import Evidence, EvidenceStatus, GroundedAnswer
 from src.utils.logging_utils import get_logger
-from src.utils.exceptions import MistralRateLimitError, GeminiRateLimitError, GenerationTimeoutError, GeminiServiceUnavailableError, MissingAPIKeyError
+from src.utils.exceptions import MistralRateLimitError, GeminiRateLimitError, GenerationTimeoutError, GeminiServiceUnavailableError, MistralServiceUnavailableError, MistralAuthError, MissingAPIKeyError
 
 logger = get_logger(__name__)
 
@@ -36,10 +36,10 @@ CRITICAL INVARIANTS:
 
 def get_llm_provider(config: AppConfig) -> LLMProvider:
     provider = config.LLM_PROVIDER
-    if provider == "mistral":
-        from src.generation.mistral_client import MistralProvider
-        return MistralProvider(app_config=config)
-    return default_gemini_client
+    if provider == "fake":
+        return default_gemini_client
+    from src.generation.provider_chain import ProviderChain
+    return ProviderChain(config)
 
 class AnswerGenerator:
     """
@@ -136,7 +136,7 @@ class AnswerGenerator:
                 supporting_chunk_ids=[],
                 confidence=evidence.confidence,
                 detected_conflicts=[],
-                generation_model=None,
+                generation_model=str(getattr(self.llm_provider, "last_used_model", getattr(self.llm_provider, "model", None))) if isinstance(getattr(self.llm_provider, "last_used_model", getattr(self.llm_provider, "model", None)), str) else None,
             )
 
         # State 2: CONFLICTING — Explicit Contradiction Report without picking a side
@@ -162,7 +162,7 @@ class AnswerGenerator:
                 supporting_chunk_ids=evidence.supporting_chunk_ids,
                 confidence=evidence.confidence,
                 detected_conflicts=evidence.detected_conflicts,
-                generation_model=None,
+                generation_model=str(getattr(self.llm_provider, "last_used_model", getattr(self.llm_provider, "model", None))) if isinstance(getattr(self.llm_provider, "last_used_model", getattr(self.llm_provider, "model", None)), str) else None,
             )
 
         # State 3: MARGINAL — Cautious Answer without Guessing
@@ -188,7 +188,7 @@ class AnswerGenerator:
                 supporting_chunk_ids=evidence.supporting_chunk_ids,
                 confidence=evidence.confidence,
                 detected_conflicts=[],
-                generation_model=None,
+                generation_model=str(getattr(self.llm_provider, "last_used_model", getattr(self.llm_provider, "model", None))) if isinstance(getattr(self.llm_provider, "last_used_model", getattr(self.llm_provider, "model", None)), str) else None,
             )
 
                 # State 4: SUFFICIENT - Direct Grounded Answer via Gemini
@@ -203,9 +203,9 @@ class AnswerGenerator:
                 supporting_chunk_ids=evidence.supporting_chunk_ids,
                 confidence=evidence.confidence,
                 detected_conflicts=[],
-                generation_model=self.config.GEMINI_MODEL,
+                generation_model=str(getattr(self.llm_provider, "last_used_model", getattr(self.llm_provider, "model", self.config.GEMINI_MODEL))) if isinstance(getattr(self.llm_provider, "last_used_model", getattr(self.llm_provider, "model", self.config.GEMINI_MODEL)), str) else self.config.GEMINI_MODEL,
             )
-        except (GenerationTimeoutError, GeminiServiceUnavailableError, MistralRateLimitError, GeminiRateLimitError) as e:
+        except (GenerationTimeoutError, GeminiServiceUnavailableError, MistralServiceUnavailableError, MistralAuthError, MistralRateLimitError, GeminiRateLimitError) as e:
             return GroundedAnswer(
                 query=query,
                 answer=evidence.evidence_summary or " ",
@@ -215,7 +215,7 @@ class AnswerGenerator:
                 supporting_chunk_ids=evidence.supporting_chunk_ids,
                 confidence=evidence.confidence,
                 detected_conflicts=[],
-                generation_model=None,
+                generation_model=str(getattr(self.llm_provider, "last_used_model", getattr(self.llm_provider, "model", None))) if isinstance(getattr(self.llm_provider, "last_used_model", getattr(self.llm_provider, "model", None)), str) else None,
                 llm_unavailable=True,
                 llm_unavailable_reason=str(e),
             )

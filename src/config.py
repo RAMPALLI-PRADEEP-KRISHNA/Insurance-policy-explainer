@@ -54,14 +54,15 @@ class AppConfig:
 
 
     # LLM Provider Selection
-    LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "gemini").lower()
+    LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "mistral").lower()
+    LLM_FALLBACK_PROVIDER: str = os.getenv("LLM_FALLBACK_PROVIDER", "gemini").lower()
 
     # Gemini Settings (Phase 4)
     GEMINI_API_KEY: Optional[str] = os.getenv("GEMINI_API_KEY", None)
     GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
     GEMINI_TIMEOUT_SECONDS: int = int(os.getenv("GEMINI_TIMEOUT_SECONDS", "30"))
-    LLM_REQUEST_TIMEOUT_SECONDS: int = int(os.getenv("LLM_REQUEST_TIMEOUT_SECONDS", "20"))
-    LLM_TOTAL_DEADLINE_SECONDS: int = int(os.getenv("LLM_TOTAL_DEADLINE_SECONDS", "30"))
+    LLM_REQUEST_TIMEOUT_SECONDS: int = int(os.getenv("LLM_REQUEST_TIMEOUT_SECONDS", "15"))
+    LLM_TOTAL_DEADLINE_SECONDS: int = int(os.getenv("LLM_TOTAL_DEADLINE_SECONDS", "40"))
     GEMINI_TEMPERATURE: float = float(os.getenv("GEMINI_TEMPERATURE", "0.0"))
 
     # Mistral Settings

@@ -1,7 +1,27 @@
+import time
+from typing import Optional
+from mistralai.client import Mistral
+from mistralai.client.models import UserMessage, SystemMessage
+from src.generation.llm_provider import LLMProvider
+from src.config import AppConfig
+from src.utils.exceptions import (
+    GenerationError,
+    GenerationTimeoutError,
+    MistralRateLimitError,
+    MistralAuthError,
+    MistralServiceUnavailableError
+)
+
+class MistralProvider(LLMProvider):
+    def __init__(self, app_config: AppConfig):
+        self.config = app_config
+        self.client = Mistral(api_key=self.config.MISTRAL_API_KEY)
+        self.model = getattr(self.config, "MISTRAL_MODEL", "mistral-small-latest")
+
     def generate(self, prompt: str, system_instruction: str, temperature: Optional[float] = None, response_schema: Optional[type] = None) -> str:
         messages = [
-            ChatMessage(role="system", content=system_instruction),
-            ChatMessage(role="user", content=prompt)
+            SystemMessage(content=system_instruction),
+            UserMessage(content=prompt)
         ]
         
         start_time = time.time()
@@ -29,7 +49,7 @@
 
                 # Auth error
                 if "401" in err_msg or "403" in err_msg or "unauthorized" in err_msg:
-                    raise GenerationError(f"Mistral authentication error: {err_msg}") from e
+                    raise MistralAuthError(f"Mistral authentication error: {err_msg}") from e
 
                 is_timeout = "timeout" in err_msg or "deadline" in err_msg
                 is_503 = "503" in err_msg or "unavailable" in err_msg or "502" in err_msg
@@ -53,7 +73,6 @@
                     if is_timeout:
                         raise GenerationTimeoutError(f"Mistral generation timed out: {err_msg}") from e
                     else:
-                        raise GenerationError(f"Mistral service unavailable: {err_msg}") from e
+                        raise MistralServiceUnavailableError(f"Mistral service unavailable: {err_msg}") from e
 
         raise GenerationError("Mistral generation failed")
-
