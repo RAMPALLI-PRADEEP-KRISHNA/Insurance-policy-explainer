@@ -3,8 +3,8 @@
 import numpy as np
 import pytest
 
-from src.ingestion.embedder import Embedder
-from src.utils.exceptions import EmbeddingError
+from backend.ingestion.embedder import Embedder
+from backend.utils.exceptions import EmbeddingError
 
 
 @pytest.fixture(scope="module")

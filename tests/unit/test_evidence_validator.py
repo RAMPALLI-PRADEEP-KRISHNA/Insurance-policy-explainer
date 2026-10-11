@@ -1,12 +1,12 @@
 """Unit tests for four-state evidence validator."""
 
-from src.models.data_models import (
+from backend.models.data_models import (
     Chunk,
     ChunkType,
     EvidenceStatus,
     RetrievalResult,
 )
-from src.retrieval.evidence_validator import EvidenceValidator
+from backend.retrieval.evidence_validator import EvidenceValidator
 
 
 def _make_result(

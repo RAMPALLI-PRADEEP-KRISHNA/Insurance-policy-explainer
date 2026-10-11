@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 import pytest
 from pydantic import ValidationError
 
-from src.models.data_models import (
+from backend.models.data_models import (
     Document,
     Page,
     Chunk,
@@ -124,7 +124,7 @@ def test_table_data_model():
 
 def test_risk_scanner_data_models():
     """Verify RiskCategory, RiskSeverity, RedFlag, and RedFlagReport data models."""
-    from src.models.data_models import (
+    from backend.models.data_models import (
         RiskCategory,
         RiskSeverity,
         RedFlag,
@@ -181,7 +181,7 @@ def test_risk_scanner_data_models():
 
 def test_comparison_data_models():
     """Verify ComparisonCategory, ComparisonCellStatus, ComparisonFact, ComparisonRow, and ComparisonReport."""
-    from src.models.data_models import (
+    from backend.models.data_models import (
         ComparisonCategory,
         ComparisonCellStatus,
         ComparisonFact,

@@ -3,8 +3,8 @@
 from pathlib import Path
 import pytest
 
-from src.utils.file_utils import calculate_sha256, validate_pdf_content
-from src.utils.exceptions import InvalidPDFError, FileSizeExceededError, PDFValidationError
+from backend.utils.file_utils import calculate_sha256, validate_pdf_content
+from backend.utils.exceptions import InvalidPDFError, FileSizeExceededError, PDFValidationError
 
 
 def test_calculate_sha256_bytes_and_file(tmp_path):

@@ -3,8 +3,8 @@
 import pytest
 import pymupdf
 
-from src.ingestion.quality_checker import QualityChecker, QualityThresholds
-from src.models.data_models import DocumentQuality
+from backend.ingestion.quality_checker import QualityChecker, QualityThresholds
+from backend.models.data_models import DocumentQuality
 
 
 def test_assess_good_quality_page():

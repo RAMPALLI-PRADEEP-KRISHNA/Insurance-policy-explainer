@@ -2,8 +2,8 @@ import time
 from unittest.mock import MagicMock, patch, call
 import pytest
 
-from src.generation.gemini_client import GeminiClient, _RETRY_MAX_ATTEMPTS, _RETRY_BASE_DELAY_S
-from src.utils.exceptions import (
+from backend.generation.gemini_client import GeminiClient, _RETRY_MAX_ATTEMPTS, _RETRY_BASE_DELAY_S
+from backend.utils.exceptions import (
     GenerationError,
     GenerationTimeoutError,
     GeminiServiceUnavailableError,
@@ -55,7 +55,7 @@ def test_gemini_client_successful_generation():
     result = client.generate(prompt="What is the waiting period?")
     assert result == "The waiting period is 36 months of continuous coverage."
 
-@patch("src.generation.gemini_client.time.sleep", return_value=None)
+@patch("backend.generation.gemini_client.time.sleep", return_value=None)
 def test_retry_succeeds_after_first_503(mock_sleep):
     mock_sdk = MagicMock()
     ok_response = MagicMock(text="The waiting period is 36 months.")
@@ -66,7 +66,7 @@ def test_retry_succeeds_after_first_503(mock_sleep):
     assert mock_sdk.models.generate_content.call_count == 2
     mock_sleep.assert_called_once()
 
-@patch("src.generation.gemini_client.time.sleep", return_value=None)
+@patch("backend.generation.gemini_client.time.sleep", return_value=None)
 def test_all_attempts_503_raises_service_unavailable(mock_sleep):
     client = _make_client([_503_exception(), _503_exception()])
     with pytest.raises(GeminiServiceUnavailableError) as exc_info:
@@ -75,7 +75,7 @@ def test_all_attempts_503_raises_service_unavailable(mock_sleep):
     assert "Gemini service unavailable" in error_msg
     assert mock_sleep.call_count == 1
 
-@patch("src.generation.gemini_client.time.sleep", return_value=None)
+@patch("backend.generation.gemini_client.time.sleep", return_value=None)
 def test_exponential_backoff_delays(mock_sleep):
     client = _make_client([_503_exception(), _503_exception()])
     with pytest.raises(GeminiServiceUnavailableError):
@@ -84,7 +84,7 @@ def test_exponential_backoff_delays(mock_sleep):
     assert len(calls) == 1
     assert calls[0] == call(1.0)
 
-@patch("src.generation.gemini_client.time.sleep", return_value=None)
+@patch("backend.generation.gemini_client.time.sleep", return_value=None)
 def test_auth_error_no_retry(mock_sleep):
     mock_sdk = MagicMock()
     mock_sdk.models.generate_content.side_effect = Exception("401 UNAUTHENTICATED. Invalid API key.")
@@ -94,7 +94,7 @@ def test_auth_error_no_retry(mock_sleep):
     assert mock_sdk.models.generate_content.call_count == 1
     mock_sleep.assert_not_called()
 
-@patch("src.generation.gemini_client.time.sleep", return_value=None)
+@patch("backend.generation.gemini_client.time.sleep", return_value=None)
 def test_other_api_error_no_retry(mock_sleep):
     mock_sdk = MagicMock()
     mock_sdk.models.generate_content.side_effect = Exception("400 INVALID_ARGUMENT. Request body malformed.")

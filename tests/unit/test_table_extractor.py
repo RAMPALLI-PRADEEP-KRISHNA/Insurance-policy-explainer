@@ -3,7 +3,7 @@
 import pytest
 import pymupdf
 
-from src.ingestion.table_extractor import TableExtractor, render_markdown_table
+from backend.ingestion.table_extractor import TableExtractor, render_markdown_table
 
 
 def test_render_markdown_table():

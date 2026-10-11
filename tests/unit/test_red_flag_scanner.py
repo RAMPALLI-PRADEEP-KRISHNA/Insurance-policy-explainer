@@ -3,7 +3,7 @@
 import uuid
 import pytest
 
-from src.models.data_models import (
+from backend.models.data_models import (
     Chunk,
     ChunkType,
     Document,
@@ -12,7 +12,7 @@ from src.models.data_models import (
     RiskCategory,
     RiskSeverity,
 )
-from src.risk_scanner.red_flag_scanner import (
+from backend.risk_scanner.red_flag_scanner import (
     RedFlagScanner,
     red_flag_scanner,
     scan_policy,

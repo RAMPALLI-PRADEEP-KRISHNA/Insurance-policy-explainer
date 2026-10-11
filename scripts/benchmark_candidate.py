@@ -26,9 +26,9 @@ def run_candidate_benchmark():
 
     # A. Application startup / critical imports
     t0 = time.perf_counter()
-    import src.config
-    import src.models.data_models
-    import src.utils.timing
+    import backend.config
+    import backend.models.data_models
+    import backend.utils.timing
     t_app_startup = time.perf_counter() - t0
     results["A_app_startup_seconds"] = t_app_startup
     print(f"A. Application base module import: {t_app_startup * 1000:.2f} ms")
@@ -41,8 +41,8 @@ def run_candidate_benchmark():
     print(f"B. FastEmbed import: {t_fastembed_import * 1000:.2f} ms")
 
     # C. Cold FastEmbed Arctic-XS initialization time
-    from src.ingestion.embedder import Embedder
-    from src.config import config
+    from backend.ingestion.embedder import Embedder
+    from backend.config import config
     cold_embedder = Embedder(
         backend="fastembed",
         model_name="snowflake/snowflake-arctic-embed-xs",
@@ -82,7 +82,7 @@ def run_candidate_benchmark():
     print(f"E. PDF read bytes ({len(pdf_bytes)} bytes): {t_pdf_read * 1000:.2f} ms")
 
     # F. PDF extraction time
-    from src.ingestion.pdf_extractor import process_pdf
+    from backend.ingestion.pdf_extractor import process_pdf
     t0 = time.perf_counter()
     doc = process_pdf(pdf_bytes, filename=pdf_path.name, save_meta=False)
     t_pdf_extract = time.perf_counter() - t0
@@ -97,7 +97,7 @@ def run_candidate_benchmark():
     print(f"G. OCR pages: {ocr_pages} (native text available on all pages)")
 
     # H. Chunking time
-    from src.ingestion.chunker import chunk_document
+    from backend.ingestion.chunker import chunk_document
     chunk_times = []
     for _ in range(5):
         t0 = time.perf_counter()
@@ -118,7 +118,7 @@ def run_candidate_benchmark():
     print(f"I. Document embedding ({len(chunks)} chunks): {t_doc_embed:.4f} s ({len(chunks) / max(t_doc_embed, 1e-6):.1f} chunks/sec)")
 
     # J & K. Qdrant index construction & persistence time
-    from src.ingestion.index_store import IndexStore
+    from database.index_store import IndexStore
     test_store_dir = PROJECT_ROOT / "data" / "benchmark_candidate_test_index"
     store = IndexStore(backend="qdrant", indexes_dir=test_store_dir, embedder_instance=cold_embedder)
 
@@ -158,7 +158,7 @@ def run_candidate_benchmark():
     print(f"N. Qdrant vector search (20 runs): median={med_vec_search * 1000:.3f} ms")
 
     # O. Hybrid scoring time
-    from src.retrieval.retriever import Retriever
+    from backend.retrieval.retriever import Retriever
     retriever_instance = Retriever(index_store=store, embedder_instance=cold_embedder)
     
     t0 = time.perf_counter()
@@ -169,7 +169,7 @@ def run_candidate_benchmark():
     print(f"O. Hybrid scoring & reranking: {t_hybrid_scoring * 1000:.3f} ms")
 
     # P. Evidence validation time
-    from src.retrieval.evidence_validator import EvidenceValidator
+    from backend.retrieval.evidence_validator import EvidenceValidator
     validator = EvidenceValidator()
     val_times = []
     for _ in range(20):
@@ -182,7 +182,7 @@ def run_candidate_benchmark():
     print(f"P. Evidence validation (20 runs): median={med_val_time * 1000:.3f} ms (Status: {evidence.status.value})")
 
     # Q. Citation assembly time
-    from src.generation.citation_assembler import assemble_citations
+    from backend.generation.citation_assembler import assemble_citations
     cit_times = []
     for _ in range(20):
         t0 = time.perf_counter()

@@ -1,7 +1,7 @@
 """Unit tests for citation assembler ensuring strict provenance and safety."""
 
-from src.generation.citation_assembler import assemble_citations
-from src.models.data_models import (
+from backend.generation.citation_assembler import assemble_citations
+from backend.models.data_models import (
     Chunk,
     ChunkType,
     Evidence,

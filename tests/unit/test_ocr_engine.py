@@ -4,7 +4,7 @@ import pytest
 import pymupdf
 from unittest.mock import patch, MagicMock
 
-from src.ingestion.ocr_engine import OCREngine
+from backend.ingestion.ocr_engine import OCREngine
 
 
 def test_tesseract_detection_when_missing():
@@ -42,7 +42,7 @@ def test_ocr_page_fallback_mocked_success():
 
     # Mock is_available to True and pytesseract.image_to_string
     with patch.object(engine, "is_available", return_value=True), \
-         patch("src.ingestion.ocr_engine.pytesseract.image_to_string", return_value="Recognized Scanned Text"):
+         patch("backend.ingestion.ocr_engine.pytesseract.image_to_string", return_value="Recognized Scanned Text"):
         text, success, err = engine.ocr_page(page)
 
     doc.close()

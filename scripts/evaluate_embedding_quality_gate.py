@@ -21,9 +21,9 @@ sys.path.insert(0, str(PROJECT_ROOT))
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-from src.ingestion.pdf_extractor import process_pdf
-from src.ingestion.chunker import chunk_document
-from src.retrieval.numeric_utils import matches_numeric_context
+from backend.ingestion.pdf_extractor import process_pdf
+from backend.ingestion.chunker import chunk_document
+from backend.retrieval.numeric_utils import matches_numeric_context
 from fastembed import TextEmbedding
 from sentence_transformers import SentenceTransformer
 

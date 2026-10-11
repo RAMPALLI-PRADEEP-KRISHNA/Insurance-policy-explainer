@@ -4,13 +4,13 @@ import time
 from pathlib import Path
 import pytest
 
-from src.ingestion.pdf_extractor import process_pdf
-from src.ingestion.chunker import chunk_document
-from src.ingestion.embedder import embedder
-from src.ingestion.index_store import IndexStore
-from src.retrieval.retriever import Retriever
-from src.retrieval.evidence_validator import EvidenceValidator
-from src.models.data_models import ChunkType, EvidenceStatus
+from backend.ingestion.pdf_extractor import process_pdf
+from backend.ingestion.chunker import chunk_document
+from backend.ingestion.embedder import embedder
+from database.index_store import IndexStore
+from backend.retrieval.retriever import Retriever
+from backend.retrieval.evidence_validator import EvidenceValidator
+from backend.models.data_models import ChunkType, EvidenceStatus
 
 
 @pytest.fixture(scope="module")

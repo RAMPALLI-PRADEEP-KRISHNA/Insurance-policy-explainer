@@ -1,11 +1,11 @@
 """Unit tests for hybrid retriever and ranking pipeline."""
 
 import pytest
-from src.ingestion.embedder import embedder
-from src.ingestion.index_store import IndexStore
-from src.models.data_models import Chunk, ChunkType, Document, DocumentStatus
-from src.retrieval.retriever import Retriever
-from src.utils.exceptions import IndexNotFoundError, RetrievalError
+from backend.ingestion.embedder import embedder
+from database.index_store import IndexStore
+from backend.models.data_models import Chunk, ChunkType, Document, DocumentStatus
+from backend.retrieval.retriever import Retriever
+from backend.utils.exceptions import IndexNotFoundError, RetrievalError
 
 
 @pytest.fixture

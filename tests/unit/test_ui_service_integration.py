@@ -4,7 +4,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 import pytest
 
-from src.app import (
+from frontend.app import (
     process_uploaded_policy,
     answer_policy_question,
     render_citations,
@@ -12,16 +12,16 @@ from src.app import (
     scan_policy_red_flags,
     render_red_flags,
 )
-from src.ingestion.embedder import embedder
-from src.ingestion.index_store import IndexStore
-from src.models.data_models import (
+from backend.ingestion.embedder import embedder
+from database.index_store import IndexStore
+from backend.models.data_models import (
     Citation,
     DocumentQuality,
     DocumentStatus,
     EvidenceStatus,
     GroundedAnswer,
 )
-from src.utils.exceptions import MissingAPIKeyError
+from backend.utils.exceptions import MissingAPIKeyError
 
 
 @pytest.fixture
@@ -34,7 +34,7 @@ def sample_pdf_bytes():
 
 def test_app_module_imports_cleanly():
     """Verify that src.app imports cleanly without errors."""
-    import src.app as app
+    import frontend.app as app
     assert hasattr(app, "process_uploaded_policy")
     assert hasattr(app, "answer_policy_question")
     assert hasattr(app, "main")
@@ -84,8 +84,8 @@ def test_answer_policy_question_sufficient_mocked(tmp_path, sample_pdf_bytes):
     mock_gemini = MagicMock()
     mock_gemini.generate.return_value = "The waiting period for pre-existing diseases is 36 months of continuous coverage."
 
-    from src.generation.answer_generator import AnswerGenerator
-    from src.retrieval.retriever import Retriever
+    from backend.generation.answer_generator import AnswerGenerator
+    from backend.retrieval.retriever import Retriever
 
     custom_retriever = Retriever(index_store=custom_store, embedder_instance=embedder)
     custom_generator = AnswerGenerator(gemini_client_instance=mock_gemini)
@@ -118,7 +118,7 @@ def test_answer_policy_question_insufficient_state(tmp_path, sample_pdf_bytes):
     custom_store = IndexStore(indexes_dir=tmp_path / "ui_indexes", embedder_instance=embedder)
     doc, _ = process_uploaded_policy(sample_pdf_bytes, "test_policy.pdf", indexes_store=custom_store)
 
-    from src.retrieval.retriever import Retriever
+    from backend.retrieval.retriever import Retriever
     custom_retriever = Retriever(index_store=custom_store, embedder_instance=embedder)
 
     query = "What are the rules regarding quantum mechanics and string theory equations?"
@@ -144,7 +144,7 @@ def test_answer_policy_question_marginal_state(tmp_path, sample_pdf_bytes):
     custom_store = IndexStore(indexes_dir=tmp_path / "ui_indexes", embedder_instance=embedder)
     doc, _ = process_uploaded_policy(sample_pdf_bytes, "test_policy.pdf", indexes_store=custom_store)
 
-    from src.retrieval.retriever import Retriever
+    from backend.retrieval.retriever import Retriever
     custom_retriever = Retriever(index_store=custom_store, embedder_instance=embedder)
 
     query = "Does the policy cover maternity and delivery expenses?"
@@ -195,9 +195,9 @@ def test_render_ui_badges_and_citations_callables():
 
 def test_answer_policy_question_missing_api_key():
     """Verify clean exception when Gemini API key is missing on SUFFICIENT question."""
-    from src.models.data_models import Chunk, ChunkType, Evidence, RetrievalResult
-    from src.generation.answer_generator import AnswerGenerator
-    from src.generation.gemini_client import GeminiClient
+    from backend.models.data_models import Chunk, ChunkType, Evidence, RetrievalResult
+    from backend.generation.answer_generator import AnswerGenerator
+    from backend.generation.gemini_client import GeminiClient
 
     client_without_key = GeminiClient(api_key=None, app_config=MagicMock(GEMINI_API_KEY=None, GEMINI_MODEL="gemini-2.5-flash", LLM_TOTAL_DEADLINE_SECONDS=30, LLM_REQUEST_TIMEOUT_SECONDS=20))
     generator = AnswerGenerator(gemini_client_instance=client_without_key)
@@ -245,7 +245,7 @@ def test_document_isolation_switching_policies(tmp_path, sample_pdf_bytes, make_
     motor_bytes = make_text_pdf(["Motor Vehicle Third Party Insurance: Limit Rs. 7,50,000 for bodily injury."])
     doc_b, _ = process_uploaded_policy(motor_bytes, "motor_policy.pdf", indexes_store=custom_store)
 
-    from src.retrieval.retriever import Retriever
+    from backend.retrieval.retriever import Retriever
     retriever_inst = Retriever(index_store=custom_store, embedder_instance=embedder)
 
     # Query Document A

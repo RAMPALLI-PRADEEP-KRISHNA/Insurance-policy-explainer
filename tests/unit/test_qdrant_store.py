@@ -5,10 +5,10 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from src.ingestion.qdrant_store import QdrantStore
-from src.ingestion.embedder import Embedder
-from src.models.data_models import Document, Chunk, ChunkType, IndexMetadata
-from src.utils.exceptions import IndexNotFoundError, CorruptedIndexError, IndexStoreError
+from database.qdrant_store import QdrantStore
+from backend.ingestion.embedder import Embedder
+from backend.models.data_models import Document, Chunk, ChunkType, IndexMetadata
+from backend.utils.exceptions import IndexNotFoundError, CorruptedIndexError, IndexStoreError
 
 
 class MockEmbedder:

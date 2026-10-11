@@ -4,11 +4,11 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 import pytest
 
-from src.app import scan_policy_red_flags, render_red_flags
-from src.ingestion.pdf_extractor import process_pdf
-from src.ingestion.chunker import chunk_document
-from src.models.data_models import RiskCategory, RiskSeverity, DocumentQuality, DocumentStatus
-from src.risk_scanner.red_flag_scanner import red_flag_scanner, RedFlagScanner
+from frontend.app import scan_policy_red_flags, render_red_flags
+from backend.ingestion.pdf_extractor import process_pdf
+from backend.ingestion.chunker import chunk_document
+from backend.models.data_models import RiskCategory, RiskSeverity, DocumentQuality, DocumentStatus
+from backend.risk_scanner.red_flag_scanner import red_flag_scanner, RedFlagScanner
 
 
 @pytest.fixture(scope="module")

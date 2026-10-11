@@ -1,9 +1,9 @@
 import pytest
 from pathlib import Path
 import json
-from src.app import process_uploaded_policy
-from src.ingestion.index_store import IndexStore
-from src.models.data_models import Document, Chunk
+from frontend.app import process_uploaded_policy
+from database.index_store import IndexStore
+from backend.models.data_models import Document, Chunk
 
 class FakeEmbedder:
     def __init__(self, dimension=768, model_name="fake-model"):
@@ -28,10 +28,10 @@ def test_fast_path_same_bytes_twice(temp_index_store, monkeypatch):
     def mock_process_pdf(temp_path, save_meta=True):
         nonlocal process_pdf_calls
         process_pdf_calls += 1
-        from src.models.data_models import Document, DocumentStatus, DocumentQuality
+        from backend.models.data_models import Document, DocumentStatus, DocumentQuality
         return Document(doc_id="dummy", filename="dummy", file_hash="dummy", page_count=1, status=DocumentStatus.READY, quality=DocumentQuality.GOOD)
         
-    monkeypatch.setattr("src.app.process_pdf", mock_process_pdf)
+    monkeypatch.setattr("frontend.app.process_pdf", mock_process_pdf)
 
     file_bytes = b"%PDF-1.4\nPDF content 1"
     
@@ -56,9 +56,9 @@ def test_fast_path_simulated_refresh(temp_index_store, tmp_path, monkeypatch):
     def mock_process_pdf(*args, **kwargs):
         nonlocal process_pdf_calls
         process_pdf_calls += 1
-        from src.models.data_models import Document, DocumentStatus, DocumentQuality
+        from backend.models.data_models import Document, DocumentStatus, DocumentQuality
         return Document(doc_id="dummy", filename="dummy", file_hash="dummy", page_count=1, status=DocumentStatus.READY, quality=DocumentQuality.GOOD)
-    monkeypatch.setattr("src.app.process_pdf", mock_process_pdf)
+    monkeypatch.setattr("frontend.app.process_pdf", mock_process_pdf)
 
     file_bytes = b"%PDF-1.4\nPDF content refresh"
     process_uploaded_policy(file_bytes, "test.pdf", indexes_store=temp_index_store)
@@ -75,9 +75,9 @@ def test_fast_path_simulated_refresh(temp_index_store, tmp_path, monkeypatch):
 
 def test_fast_path_different_bytes(temp_index_store, monkeypatch):
     def mock_process_pdf(temp_path, save_meta=True):
-        from src.models.data_models import Document, DocumentStatus, DocumentQuality
+        from backend.models.data_models import Document, DocumentStatus, DocumentQuality
         return Document(doc_id="dummy", filename="dummy", file_hash="dummy", page_count=1, status=DocumentStatus.READY, quality=DocumentQuality.GOOD)
-    monkeypatch.setattr("src.app.process_pdf", mock_process_pdf)
+    monkeypatch.setattr("frontend.app.process_pdf", mock_process_pdf)
     
     res1 = process_uploaded_policy(b"%PDF-1.4\nFile A", "A.pdf", indexes_store=temp_index_store)
     assert not res1.cache_hit
@@ -90,9 +90,9 @@ def test_fast_path_different_bytes(temp_index_store, monkeypatch):
 
 def test_fast_path_model_change_invalidates(temp_index_store, monkeypatch):
     def mock_process_pdf(temp_path, save_meta=True):
-        from src.models.data_models import Document, DocumentStatus, DocumentQuality
+        from backend.models.data_models import Document, DocumentStatus, DocumentQuality
         return Document(doc_id="dummy", filename="dummy", file_hash="dummy", page_count=1, status=DocumentStatus.READY, quality=DocumentQuality.GOOD)
-    monkeypatch.setattr("src.app.process_pdf", mock_process_pdf)
+    monkeypatch.setattr("frontend.app.process_pdf", mock_process_pdf)
 
     file_bytes = b"%PDF-1.4\nPDF content model change"
     res1 = process_uploaded_policy(file_bytes, "test.pdf", indexes_store=temp_index_store)
@@ -106,9 +106,9 @@ def test_fast_path_model_change_invalidates(temp_index_store, monkeypatch):
 
 def test_fast_path_corrupt_index_rebuilds(temp_index_store, monkeypatch):
     def mock_process_pdf(temp_path, save_meta=True):
-        from src.models.data_models import Document, DocumentStatus, DocumentQuality
+        from backend.models.data_models import Document, DocumentStatus, DocumentQuality
         return Document(doc_id="dummy", filename="dummy", file_hash="dummy", page_count=1, status=DocumentStatus.READY, quality=DocumentQuality.GOOD)
-    monkeypatch.setattr("src.app.process_pdf", mock_process_pdf)
+    monkeypatch.setattr("frontend.app.process_pdf", mock_process_pdf)
 
     file_bytes = b"%PDF-1.4\nPDF content corrupt"
     res1 = process_uploaded_policy(file_bytes, "test.pdf", indexes_store=temp_index_store)

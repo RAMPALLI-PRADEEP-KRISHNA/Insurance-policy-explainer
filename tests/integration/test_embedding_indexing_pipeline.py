@@ -3,11 +3,11 @@
 from pathlib import Path
 import pytest
 
-from src.ingestion.pdf_extractor import process_pdf
-from src.ingestion.chunker import chunk_document
-from src.ingestion.embedder import embedder
-from src.ingestion.index_store import IndexStore
-from src.models.data_models import ChunkType
+from backend.ingestion.pdf_extractor import process_pdf
+from backend.ingestion.chunker import chunk_document
+from backend.ingestion.embedder import embedder
+from database.index_store import IndexStore
+from backend.models.data_models import ChunkType
 
 
 def test_end_to_end_embedding_and_faiss_smoke_test(tmp_path):

@@ -4,11 +4,11 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 import pytest
 
-from src.app import compare_uploaded_policies, render_comparison_report
-from src.comparison.comparison_engine import compare_policies
-from src.ingestion.pdf_extractor import process_pdf
-from src.ingestion.chunker import chunk_document
-from src.models.data_models import (
+from frontend.app import compare_uploaded_policies, render_comparison_report
+from backend.comparison.comparison_engine import compare_policies
+from backend.ingestion.pdf_extractor import process_pdf
+from backend.ingestion.chunker import chunk_document
+from backend.models.data_models import (
     ComparisonCategory,
     ComparisonCellStatus,
     DocumentQuality,

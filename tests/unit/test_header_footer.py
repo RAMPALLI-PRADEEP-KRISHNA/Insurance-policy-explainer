@@ -1,7 +1,7 @@
 """Unit tests for conservative header/footer detection."""
 
 import pytest
-from src.ingestion.header_footer import HeaderFooterDetector
+from backend.ingestion.header_footer import HeaderFooterDetector
 
 
 def test_detect_repeated_headers_and_footers():

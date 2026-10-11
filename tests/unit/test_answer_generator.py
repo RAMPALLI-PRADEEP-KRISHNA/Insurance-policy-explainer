@@ -2,8 +2,8 @@
 
 from unittest.mock import MagicMock
 import pytest
-from src.generation.answer_generator import AnswerGenerator
-from src.models.data_models import (
+from backend.generation.answer_generator import AnswerGenerator
+from backend.models.data_models import (
     Chunk,
     ChunkType,
     Evidence,
@@ -267,9 +267,9 @@ def test_answer_generation_preserves_numeric_conditions():
     assert answer.citations[0].chunk_id == "c_ped_en"
 import pytest
 from unittest.mock import MagicMock
-from src.generation.answer_generator import AnswerGenerator
-from src.models.data_models import Evidence, EvidenceStatus
-from src.utils.exceptions import GeminiRateLimitError, MissingAPIKeyError, GenerationTimeoutError
+from backend.generation.answer_generator import AnswerGenerator
+from backend.models.data_models import Evidence, EvidenceStatus
+from backend.utils.exceptions import GeminiRateLimitError, MissingAPIKeyError, GenerationTimeoutError
 
 def test_generator_429_llm_unavailable():
     mock_client = MagicMock()

@@ -2,7 +2,7 @@ import pytest
 import os
 import json
 from pathlib import Path
-from src.ingestion.index_store import IndexStore
+from database.index_store import IndexStore
 
 def test_cleanup_invalid_folders(tmp_path):
     store = IndexStore(indexes_dir=tmp_path)

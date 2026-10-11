@@ -100,7 +100,7 @@ def disable_llm_for_tests(request, monkeypatch):
         monkeypatch.delenv("GEMINI_API_KEY", raising=False)
         monkeypatch.delenv("MISTRAL_API_KEY", raising=False)
         monkeypatch.setenv("LLM_PROVIDER", "fake")
-        from src.config import config
+        from backend.config import config
         monkeypatch.setattr(config, "LLM_PROVIDER", "fake")
         test_qdrant = Path(tempfile.gettempdir()) / "insurance_test_qdrant_db"
         test_qdrant.mkdir(parents=True, exist_ok=True)

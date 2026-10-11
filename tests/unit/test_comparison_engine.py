@@ -3,21 +3,21 @@
 import uuid
 import pytest
 
-from src.comparison.comparison_engine import (
+from backend.comparison.comparison_engine import (
     ComparisonEngine,
     comparison_engine,
     compare_policies,
 )
-from src.comparison.evidence_extractor import (
+from backend.comparison.evidence_extractor import (
     ComparisonEvidenceExtractor,
     comparison_evidence_extractor,
 )
-from src.comparison.normalizer import (
+from backend.comparison.normalizer import (
     ComparisonNormalizer,
     comparison_normalizer,
     generate_difference_description,
 )
-from src.models.data_models import (
+from backend.models.data_models import (
     Chunk,
     ChunkType,
     Citation,

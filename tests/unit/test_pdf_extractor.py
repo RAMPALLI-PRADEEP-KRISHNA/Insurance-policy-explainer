@@ -4,9 +4,9 @@ import pytest
 from pathlib import Path
 from unittest.mock import patch
 
-from src.ingestion.pdf_extractor import PDFExtractor, process_pdf
-from src.models.data_models import DocumentStatus, DocumentQuality, ExtractionMethod
-from src.utils.exceptions import (
+from backend.ingestion.pdf_extractor import PDFExtractor, process_pdf
+from backend.models.data_models import DocumentStatus, DocumentQuality, ExtractionMethod
+from backend.utils.exceptions import (
     InvalidPDFError,
     PDFValidationError,
     PageLimitExceededError,
@@ -99,7 +99,7 @@ def test_ocr_required_page_detection_without_tesseract(make_scanned_image_pdf):
     pdf_bytes = make_scanned_image_pdf("SCANNED POLICY CONTENT")
 
     # Force ocr_engine.is_available to return False
-    with patch("src.ingestion.ocr_engine.ocr_engine.is_available", return_value=False):
+    with patch("backend.ingestion.ocr_engine.ocr_engine.is_available", return_value=False):
         doc = process_pdf(pdf_bytes, filename="scanned.pdf", save_meta=False)
 
     assert doc.page_count == 1

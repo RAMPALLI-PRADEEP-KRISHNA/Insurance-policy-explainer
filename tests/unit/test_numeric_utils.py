@@ -1,6 +1,6 @@
 """Unit tests for numeric entity extraction and preservation utilities."""
 
-from src.retrieval.numeric_utils import (
+from backend.retrieval.numeric_utils import (
     NumericEntity,
     extract_numeric_entities,
     matches_numeric_context,

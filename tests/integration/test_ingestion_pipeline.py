@@ -5,8 +5,8 @@ from pathlib import Path
 import pytest
 import pymupdf
 
-from src.ingestion.pdf_extractor import process_pdf
-from src.models.data_models import Document, DocumentStatus, DocumentQuality
+from backend.ingestion.pdf_extractor import process_pdf
+from backend.models.data_models import Document, DocumentStatus, DocumentQuality
 
 
 def test_end_to_end_ingestion_and_persistence(tmp_path):

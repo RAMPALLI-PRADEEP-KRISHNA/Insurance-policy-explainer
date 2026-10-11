@@ -2,10 +2,10 @@ import pytest
 import time
 from unittest.mock import patch, MagicMock
 
-from src.generation.provider_chain import ProviderChain
-from src.generation.answer_generator import get_llm_provider, AnswerGenerator
-from src.config import AppConfig
-from src.utils.exceptions import (
+from backend.generation.provider_chain import ProviderChain
+from backend.generation.answer_generator import get_llm_provider, AnswerGenerator
+from backend.config import AppConfig
+from backend.utils.exceptions import (
     MistralRateLimitError,
     GeminiRateLimitError,
     MistralServiceUnavailableError,
@@ -17,7 +17,7 @@ from src.utils.exceptions import (
     ModelUnavailableError,
     GenerationError,
 )
-from src.models.data_models import Evidence, EvidenceStatus
+from backend.models.data_models import Evidence, EvidenceStatus
 
 
 @pytest.fixture
@@ -32,8 +32,8 @@ def mock_config():
 
 
 def test_mistral_succeeds_gemini_not_called(mock_config):
-    with patch("src.generation.mistral_client.MistralProvider") as mock_mistral, \
-         patch("src.generation.gemini_client.GeminiClient") as mock_gemini:
+    with patch("backend.generation.mistral_client.MistralProvider") as mock_mistral, \
+         patch("backend.generation.gemini_client.GeminiClient") as mock_gemini:
 
         mock_m = MagicMock()
         mock_m.generate.return_value = "Mistral Answer"
@@ -53,8 +53,8 @@ def test_mistral_succeeds_gemini_not_called(mock_config):
 
 
 def test_mistral_429_gemini_answers(mock_config):
-    with patch("src.generation.mistral_client.MistralProvider") as mock_mistral, \
-         patch("src.generation.gemini_client.GeminiClient") as mock_gemini:
+    with patch("backend.generation.mistral_client.MistralProvider") as mock_mistral, \
+         patch("backend.generation.gemini_client.GeminiClient") as mock_gemini:
 
         mock_m = MagicMock()
         mock_m.generate.side_effect = MistralRateLimitError("429")
@@ -74,8 +74,8 @@ def test_mistral_429_gemini_answers(mock_config):
 
 
 def test_mistral_503_gemini_answers(mock_config):
-    with patch("src.generation.mistral_client.MistralProvider") as mock_mistral, \
-         patch("src.generation.gemini_client.GeminiClient") as mock_gemini:
+    with patch("backend.generation.mistral_client.MistralProvider") as mock_mistral, \
+         patch("backend.generation.gemini_client.GeminiClient") as mock_gemini:
 
         mock_m = MagicMock()
         mock_m.generate.side_effect = MistralServiceUnavailableError("503")
@@ -91,8 +91,8 @@ def test_mistral_503_gemini_answers(mock_config):
 
 
 def test_mistral_timeout_gemini_answers(mock_config):
-    with patch("src.generation.mistral_client.MistralProvider") as mock_mistral, \
-         patch("src.generation.gemini_client.GeminiClient") as mock_gemini:
+    with patch("backend.generation.mistral_client.MistralProvider") as mock_mistral, \
+         patch("backend.generation.gemini_client.GeminiClient") as mock_gemini:
 
         mock_m = MagicMock()
         mock_m.generate.side_effect = GenerationTimeoutError("timeout")
@@ -108,8 +108,8 @@ def test_mistral_timeout_gemini_answers(mock_config):
 
 
 def test_mistral_auth_error_gemini_answers(mock_config):
-    with patch("src.generation.mistral_client.MistralProvider") as mock_mistral, \
-         patch("src.generation.gemini_client.GeminiClient") as mock_gemini:
+    with patch("backend.generation.mistral_client.MistralProvider") as mock_mistral, \
+         patch("backend.generation.gemini_client.GeminiClient") as mock_gemini:
 
         mock_m = MagicMock()
         mock_m.generate.side_effect = MistralAuthError("401")
@@ -126,8 +126,8 @@ def test_mistral_auth_error_gemini_answers(mock_config):
 
 def test_mistral_tier_error_gemini_answers(mock_config):
     """Test that 403 tier_not_allowed on Mistral triggers instant fallback to Gemini."""
-    with patch("src.generation.mistral_client.MistralProvider") as mock_mistral, \
-         patch("src.generation.gemini_client.GeminiClient") as mock_gemini:
+    with patch("backend.generation.mistral_client.MistralProvider") as mock_mistral, \
+         patch("backend.generation.gemini_client.GeminiClient") as mock_gemini:
 
         mock_m = MagicMock()
         mock_m.generate.side_effect = MistralTierError("Mistral model 'mistral-large-4' is not available in subscription tier")
@@ -147,8 +147,8 @@ def test_mistral_tier_error_gemini_answers(mock_config):
 
 
 def test_both_fail_llm_unavailable(mock_config):
-    with patch("src.generation.mistral_client.MistralProvider") as mock_mistral, \
-         patch("src.generation.gemini_client.GeminiClient") as mock_gemini:
+    with patch("backend.generation.mistral_client.MistralProvider") as mock_mistral, \
+         patch("backend.generation.gemini_client.GeminiClient") as mock_gemini:
 
         mock_m = MagicMock()
         mock_m.generate.side_effect = MistralRateLimitError("mistral rate 429")
@@ -172,8 +172,8 @@ def test_both_fail_llm_unavailable(mock_config):
 
 def test_both_fail_tier_and_timeout_clean_reason(mock_config):
     """Simulate user's exact production failure mode: mistral tier error + gemini timeout."""
-    with patch("src.generation.mistral_client.MistralProvider") as mock_mistral, \
-         patch("src.generation.gemini_client.GeminiClient") as mock_gemini:
+    with patch("backend.generation.mistral_client.MistralProvider") as mock_mistral, \
+         patch("backend.generation.gemini_client.GeminiClient") as mock_gemini:
 
         mock_m = MagicMock()
         mock_m.generate.side_effect = MistralTierError("tier_not_allowed")
@@ -197,7 +197,7 @@ def test_both_fail_tier_and_timeout_clean_reason(mock_config):
 
 def test_missing_mistral_key_gemini_only(mock_config):
     mock_config.MISTRAL_API_KEY = None
-    with patch("src.generation.gemini_client.GeminiClient") as mock_gemini:
+    with patch("backend.generation.gemini_client.GeminiClient") as mock_gemini:
         mock_g = MagicMock()
         mock_g.generate.return_value = "Gemini Answer"
         mock_g.model = "gemini"
@@ -214,8 +214,8 @@ def test_missing_mistral_key_gemini_only(mock_config):
 def test_total_deadline_respected(mock_config, monkeypatch):
     mock_config.LLM_TOTAL_DEADLINE_SECONDS = 0.5
 
-    with patch("src.generation.mistral_client.MistralProvider") as mock_mistral, \
-         patch("src.generation.gemini_client.GeminiClient") as mock_gemini:
+    with patch("backend.generation.mistral_client.MistralProvider") as mock_mistral, \
+         patch("backend.generation.gemini_client.GeminiClient") as mock_gemini:
 
         def slow_generate(*args, **kwargs):
             time.sleep(0.6)

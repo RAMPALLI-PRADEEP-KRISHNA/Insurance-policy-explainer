@@ -11,14 +11,14 @@ os.environ['HF_HUB_OFFLINE'] = '1'
 import torch
 os.environ['OMP_NUM_THREADS'] = '1'
 
-from src.config import config
+from backend.config import config
 config.LLM_PROVIDER = 'fake'
 
-from src.ingestion.pdf_extractor import process_pdf
-from src.ingestion.chunker import chunk_document
-from src.ingestion.embedder import embedder
-from src.ingestion.index_store import index_store
-from src.retrieval.evidence_validator import EvidenceValidator
+from backend.ingestion.pdf_extractor import process_pdf
+from backend.ingestion.chunker import chunk_document
+from backend.ingestion.embedder import embedder
+from database.index_store import index_store
+from backend.retrieval.evidence_validator import EvidenceValidator
 
 def main():
     csv_path = Path("eval/real_policy_gold.csv")

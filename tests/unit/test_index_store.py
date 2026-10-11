@@ -5,10 +5,10 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from src.ingestion.index_store import IndexStore
-from src.ingestion.embedder import embedder
-from src.models.data_models import Document, Chunk, ChunkType, IndexMetadata
-from src.utils.exceptions import IndexNotFoundError, StaleIndexError, CorruptedIndexError
+from database.index_store import IndexStore
+from backend.ingestion.embedder import embedder
+from backend.models.data_models import Document, Chunk, ChunkType, IndexMetadata
+from backend.utils.exceptions import IndexNotFoundError, StaleIndexError, CorruptedIndexError
 
 
 @pytest.fixture

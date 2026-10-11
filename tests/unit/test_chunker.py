@@ -3,9 +3,9 @@
 import pytest
 import pymupdf
 
-from src.ingestion.pdf_extractor import process_pdf
-from src.ingestion.chunker import Chunker, chunk_document
-from src.models.data_models import Document, Page, Chunk, ChunkType, TableData
+from backend.ingestion.pdf_extractor import process_pdf
+from backend.ingestion.chunker import Chunker, chunk_document
+from backend.models.data_models import Document, Page, Chunk, ChunkType, TableData
 
 
 def test_normal_paragraphs_and_headings(make_text_pdf):
@@ -131,7 +131,7 @@ def test_large_table_split_preserves_headers(make_text_pdf):
     # Manually create a TableData with 10 rows
     headers = ["Service", "Daily Limit", "Copay"]
     rows = [[f"Procedure {i}", f"Rs. {i * 1000}", f"{i}%"] for i in range(1, 15)]
-    from src.ingestion.table_extractor import render_markdown_table
+    from backend.ingestion.table_extractor import render_markdown_table
     table_md = render_markdown_table(headers, rows)
 
     table_data = TableData(

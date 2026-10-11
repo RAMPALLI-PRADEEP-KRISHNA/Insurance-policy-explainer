@@ -2,9 +2,9 @@ import time
 import pytest
 from unittest.mock import MagicMock, patch
 
-from src.config import config
-from src.generation.gemini_client import GeminiClient
-from src.utils.exceptions import GenerationTimeoutError, GeminiServiceUnavailableError, GeminiRateLimitError
+from backend.config import config
+from backend.generation.gemini_client import GeminiClient
+from backend.utils.exceptions import GenerationTimeoutError, GeminiServiceUnavailableError, GeminiRateLimitError
 
 def test_hangs_longer_than_timeout(monkeypatch):
     """Test that a TimeoutError triggers the fallback and finishes quickly."""

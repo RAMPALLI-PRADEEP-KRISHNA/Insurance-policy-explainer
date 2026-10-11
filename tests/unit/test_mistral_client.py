@@ -1,9 +1,9 @@
 import pytest
 from unittest.mock import MagicMock, patch
 
-from src.generation.mistral_client import MistralProvider
-from src.config import AppConfig
-from src.utils.exceptions import (
+from backend.generation.mistral_client import MistralProvider
+from backend.config import AppConfig
+from backend.utils.exceptions import (
     GenerationError,
     GenerationTimeoutError,
     MistralRateLimitError,
@@ -83,7 +83,7 @@ def test_mistral_timeout_fails_immediately_without_retry(mock_config):
     assert provider.client.chat.complete.call_count == 1
 
 
-@patch("src.generation.mistral_client.time.sleep", return_value=None)
+@patch("backend.generation.mistral_client.time.sleep", return_value=None)
 def test_mistral_transient_503_retries_and_succeeds(mock_sleep, mock_config):
     provider = MistralProvider(mock_config)
     mock_resp = MagicMock()
@@ -98,7 +98,7 @@ def test_mistral_transient_503_retries_and_succeeds(mock_sleep, mock_config):
     mock_sleep.assert_called_once()
 
 
-@patch("src.generation.mistral_client.time.sleep", return_value=None)
+@patch("backend.generation.mistral_client.time.sleep", return_value=None)
 def test_mistral_transient_503_exhausted_raises_service_unavailable(mock_sleep, mock_config):
     provider = MistralProvider(mock_config)
     provider.client.chat.complete = MagicMock(

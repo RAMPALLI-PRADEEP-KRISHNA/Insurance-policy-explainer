@@ -24,17 +24,17 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.config import config
-from src.ingestion.pdf_extractor import process_pdf
-from src.ingestion.chunker import chunk_document
-from src.ingestion.index_store import index_store
-from src.retrieval.retriever import Retriever
-from src.retrieval.evidence_validator import EvidenceValidator
-from src.generation.answer_generator import AnswerGenerator
-from src.generation.gemini_client import GeminiClient
-from src.comparison.comparison_engine import compare_policies
-from src.risk_scanner.red_flag_scanner import red_flag_scanner
-from src.models.data_models import (
+from backend.config import config
+from backend.ingestion.pdf_extractor import process_pdf
+from backend.ingestion.chunker import chunk_document
+from database.index_store import index_store
+from backend.retrieval.retriever import Retriever
+from backend.retrieval.evidence_validator import EvidenceValidator
+from backend.generation.answer_generator import AnswerGenerator
+from backend.generation.gemini_client import GeminiClient
+from backend.comparison.comparison_engine import compare_policies
+from backend.risk_scanner.red_flag_scanner import red_flag_scanner
+from backend.models.data_models import (
     Document,
     Chunk,
     EvidenceStatus,

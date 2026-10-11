@@ -4,13 +4,13 @@ from pathlib import Path
 from unittest.mock import MagicMock
 import pytest
 
-from src.app import process_uploaded_policy, answer_policy_question
-from src.ingestion.embedder import embedder
-from src.ingestion.index_store import IndexStore
-from src.generation.answer_generator import AnswerGenerator
-from src.retrieval.retriever import Retriever
-from src.retrieval.evidence_validator import EvidenceValidator
-from src.models.data_models import DocumentQuality, DocumentStatus, EvidenceStatus
+from frontend.app import process_uploaded_policy, answer_policy_question
+from backend.ingestion.embedder import embedder
+from database.index_store import IndexStore
+from backend.generation.answer_generator import AnswerGenerator
+from backend.retrieval.retriever import Retriever
+from backend.retrieval.evidence_validator import EvidenceValidator
+from backend.models.data_models import DocumentQuality, DocumentStatus, EvidenceStatus
 
 
 @pytest.fixture(scope="module")

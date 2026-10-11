@@ -9,7 +9,7 @@ from tests.evaluation.evaluation_runner import EvaluationRunner
 
 @pytest.fixture(scope="module")
 def evaluation_results():
-    from src.config import config
+    from backend.config import config
     config.LLM_PROVIDER = "fake"
     import os
     os.environ.pop("GEMINI_API_KEY", None)
