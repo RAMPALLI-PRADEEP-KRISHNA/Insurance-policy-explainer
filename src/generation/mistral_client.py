@@ -9,24 +9,32 @@ from src.utils.exceptions import (
     GenerationTimeoutError,
     MistralRateLimitError,
     MistralAuthError,
-    MistralServiceUnavailableError
+    MistralTierError,
+    MistralServiceUnavailableError,
 )
+
 
 class MistralProvider(LLMProvider):
     def __init__(self, app_config: AppConfig):
         self.config = app_config
-        self.client = Mistral(api_key=self.config.MISTRAL_API_KEY)
-        self.model = getattr(self.config, "MISTRAL_MODEL", "mistral-small-latest")
+        timeout_s = getattr(self.config, "LLM_REQUEST_TIMEOUT_SECONDS", 15)
+        self.timeout_ms = int(timeout_s * 1000)
+        self.client = Mistral(api_key=self.config.MISTRAL_API_KEY, timeout_ms=self.timeout_ms)
+        self.model = getattr(self.config, "MISTRAL_MODEL", "ministral-8b-latest")
 
-    def generate(self, prompt: str, system_instruction: str, temperature: Optional[float] = None, response_schema: Optional[type] = None) -> str:
+    def generate(
+        self,
+        prompt: str,
+        system_instruction: str,
+        temperature: Optional[float] = None,
+        response_schema: Optional[type] = None,
+    ) -> str:
         messages = [
             SystemMessage(content=system_instruction),
-            UserMessage(content=prompt)
+            UserMessage(content=prompt),
         ]
-        
+
         start_time = time.time()
-        
-        # Mistral uses max 2 attempts as well
         _RETRY_MAX_ATTEMPTS = 2
         _RETRY_BASE_DELAY_S = 1.0
 
@@ -43,36 +51,45 @@ class MistralProvider(LLMProvider):
                 )
                 print(f"[TIMING] LLM request - Provider: Mistral, Model: {self.model}, Outcome: success, Attempts: {attempt}")
                 return response.choices[0].message.content
-                
+
             except Exception as e:
                 err_msg = str(e).lower()
 
-                # Auth error
-                if "401" in err_msg or "403" in err_msg or "unauthorized" in err_msg:
+                # Model tier restriction (HTTP 403 tier_not_allowed)
+                if "tier_not_allowed" in err_msg or "not available in your subscription tier" in err_msg:
+                    print(f"[TIMING] LLM request - Provider: Mistral, Model: {self.model}, Outcome: tier_not_allowed, Attempts: {attempt}")
+                    raise MistralTierError(f"Mistral model '{self.model}' is not available in your subscription tier: {err_msg}") from e
+
+                # Permanent authentication / authorization error (401 / bad key)
+                if "401" in err_msg or "unauthorized" in err_msg or "unauthenticated" in err_msg or ("403" in err_msg and "forbidden" in err_msg):
+                    print(f"[TIMING] LLM request - Provider: Mistral, Model: {self.model}, Outcome: auth_error, Attempts: {attempt}")
                     raise MistralAuthError(f"Mistral authentication error: {err_msg}") from e
 
-                is_timeout = "timeout" in err_msg or "deadline" in err_msg
-                is_503 = "503" in err_msg or "unavailable" in err_msg or "502" in err_msg
-                is_429 = "429" in err_msg or "rate limit" in err_msg
-
+                # Rate limit (429) — non-retryable, fail fast so fallback provider has remaining budget
+                is_429 = "429" in err_msg or "rate limit" in err_msg or "quota" in err_msg
                 if is_429:
                     print(f"[TIMING] LLM request - Provider: Mistral, Model: {self.model}, Outcome: rate_limited, Attempts: {attempt}")
                     raise MistralRateLimitError(f"Mistral rate limit exceeded: {err_msg}") from e
 
-                if not (is_timeout or is_503):
+                # Timeout — non-retryable, fail fast
+                is_timeout = "timeout" in err_msg or "deadline" in err_msg or isinstance(e, TimeoutError)
+                if is_timeout:
+                    print(f"[TIMING] LLM request - Provider: Mistral, Model: {self.model}, Outcome: timeout, Attempts: {attempt}")
+                    raise GenerationTimeoutError(f"Mistral generation timed out: {err_msg}") from e
+
+                # Transient 503 / 502 service unavailable
+                is_503 = "503" in err_msg or "unavailable" in err_msg or "502" in err_msg
+                if not is_503:
                     raise GenerationError(f"Mistral generation error: {err_msg}") from e
 
-                # Retry logic
-                if attempt < _RETRY_MAX_ATTEMPTS:
+                # Retry logic for transient 503 only if remaining budget allows
+                remaining_budget = self.config.LLM_TOTAL_DEADLINE_SECONDS - (time.time() - start_time)
+                if attempt < _RETRY_MAX_ATTEMPTS and remaining_budget > 3.0:
                     delay = min(_RETRY_BASE_DELAY_S * (2 ** (attempt - 1)), 1.0)
                     time.sleep(delay)
                     continue
                 else:
-                    outcome = "timeout" if is_timeout else "unavailable"
-                    print(f"[TIMING] LLM request - Provider: Mistral, Model: {self.model}, Outcome: {outcome}, Attempts: {attempt}")
-                    if is_timeout:
-                        raise GenerationTimeoutError(f"Mistral generation timed out: {err_msg}") from e
-                    else:
-                        raise MistralServiceUnavailableError(f"Mistral service unavailable: {err_msg}") from e
+                    print(f"[TIMING] LLM request - Provider: Mistral, Model: {self.model}, Outcome: unavailable, Attempts: {attempt}")
+                    raise MistralServiceUnavailableError(f"Mistral service unavailable: {err_msg}") from e
 
         raise GenerationError("Mistral generation failed")

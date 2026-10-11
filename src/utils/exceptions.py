@@ -93,7 +93,12 @@ class GenerationError(InsuranceExplainerError):
 
 
 class ModelUnavailableError(GenerationError):
-    """Raised when the configured Gemini model is unavailable or invalid."""
+    """Raised when the configured LLM model is unavailable or invalid."""
+    pass
+
+
+class MistralTierError(ModelUnavailableError):
+    """Raised when the configured Mistral model is not allowed in the subscription tier."""
     pass
 
 

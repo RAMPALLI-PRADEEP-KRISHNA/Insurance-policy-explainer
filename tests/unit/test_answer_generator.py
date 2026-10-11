@@ -238,34 +238,33 @@ def test_citation_integrity_cannot_be_overwritten_by_llm():
     assert answer.citations[0].chunk_id == "c_ped_real"
 
 
-def test_tamil_answer_generation():
-    """Verify Tamil answer generation preserves numbers, conditions, and authoritative citations."""
+def test_answer_generation_preserves_numeric_conditions():
+    """Verify English answer generation strictly preserves numbers, conditions, and authoritative citations."""
     mock_gemini = MagicMock()
-    mock_gemini.generate.side_effect = [
-        "The waiting period for pre-existing diseases is 36 months of continuous coverage.",
-        "முன்பே இருக்கும் நோய்களுக்கான காத்திருப்பு காலம் 36 months (முப்பத்தாறு மாதங்கள்) ஆகும்.",
-    ]
+    mock_gemini.generate.return_value = (
+        "The waiting period for pre-existing diseases is 36 months of continuous coverage."
+    )
 
     generator = AnswerGenerator(gemini_client_instance=mock_gemini)
-    query = "ஏற்கனவே உள்ள நோய்களுக்கான காத்திருப்பு காலம் என்ன?"
-    r1 = _make_chunk_result("c_ped_tamil", "2.3 Pre-existing Disease Waiting Period: 36 months", page_number=2)
+    query = "What is the waiting period for pre-existing diseases?"
+    r1 = _make_chunk_result("c_ped_en", "2.3 Pre-existing Disease Waiting Period: 36 months", page_number=2)
     evidence = Evidence(
         query=query,
         doc_id="doc_policy_01",
         status=EvidenceStatus.SUFFICIENT,
         results=[r1],
-        supporting_chunk_ids=["c_ped_tamil"],
+        supporting_chunk_ids=["c_ped_en"],
         confidence=0.89,
         evidence_summary="36 months waiting period",
     )
 
-    answer = generator.generate_answer(query, evidence, language="ta")
+    answer = generator.generate_answer(query, evidence, language="en")
 
-    assert answer.language == "ta"
+    assert answer.language == "en"
     assert "36" in answer.answer
     assert len(answer.citations) == 1
     assert answer.citations[0].page_number == 2
-    assert answer.citations[0].chunk_id == "c_ped_tamil"
+    assert answer.citations[0].chunk_id == "c_ped_en"
 import pytest
 from unittest.mock import MagicMock
 from src.generation.answer_generator import AnswerGenerator

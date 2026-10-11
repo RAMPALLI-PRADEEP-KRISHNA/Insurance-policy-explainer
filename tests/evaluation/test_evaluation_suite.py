@@ -52,10 +52,12 @@ def test_controlled_abstention_accuracy(evaluation_results):
     assert summary["abstention_accuracy"] == 100.0
 
 
-def test_tamil_multilingual_performance(evaluation_results):
-    """Verify Tamil queries achieve high recall and grounded answers."""
+def test_dataset_scale_and_balance(evaluation_results):
+    """Verify dataset scale meets minimum of 30 answerable and 15 unanswerable English cases."""
     summary = evaluation_results["summary"]
-    assert summary["tamil_accuracy"] >= 90.0
+    assert summary["qa_cases_count"] >= 45, f"Total QA cases too low: {summary['qa_cases_count']}"
+    assert summary["answerable_cases_count"] >= 30, f"Answerable cases too low: {summary['answerable_cases_count']}"
+    assert summary["unanswerable_cases_count"] >= 15, f"Unanswerable cases too low: {summary['unanswerable_cases_count']}"
 
 
 def test_two_policy_comparison_accuracy(evaluation_results):

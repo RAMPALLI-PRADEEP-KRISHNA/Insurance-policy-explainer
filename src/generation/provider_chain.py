@@ -10,18 +10,21 @@ from src.utils.exceptions import (
     MistralServiceUnavailableError,
     GeminiServiceUnavailableError,
     MistralAuthError,
+    MistralTierError,
+    ModelUnavailableError,
     MissingAPIKeyError,
-    GenerationError
+    GenerationError,
 )
 
 logger = get_logger(__name__)
+
 
 class ProviderChain(LLMProvider):
     def __init__(self, config: AppConfig):
         self.config = config
         self.primary_name = config.LLM_PROVIDER
         self.fallback_name = getattr(config, "LLM_FALLBACK_PROVIDER", "gemini")
-        
+
         self.primary_client = self._instantiate_client(self.primary_name)
         self.fallback_client = self._instantiate_client(self.fallback_name)
         self.last_used_model = None
@@ -43,7 +46,13 @@ class ProviderChain(LLMProvider):
     def model(self):
         return self.last_used_model or "provider-chain"
 
-    def generate(self, prompt: str, system_instruction: str, temperature: Optional[float] = None, response_schema: Optional[type] = None) -> str:
+    def generate(
+        self,
+        prompt: str,
+        system_instruction: str,
+        temperature: Optional[float] = None,
+        response_schema: Optional[type] = None,
+    ) -> str:
         start_time = time.time()
         providers = []
         if self.primary_client:
@@ -60,38 +69,65 @@ class ProviderChain(LLMProvider):
         for provider_name, client in providers:
             elapsed = time.time() - start_time
             if elapsed >= self.config.LLM_TOTAL_DEADLINE_SECONDS:
+                logger.warning(
+                    "[LLM] Total deadline (%ss) reached before calling %s",
+                    self.config.LLM_TOTAL_DEADLINE_SECONDS,
+                    provider_name,
+                )
                 break
-            
+
             try:
                 response = client.generate(
-                    prompt=prompt, 
-                    system_instruction=system_instruction, 
-                    temperature=temperature, 
-                    response_schema=response_schema
+                    prompt=prompt,
+                    system_instruction=system_instruction,
+                    temperature=temperature,
+                    response_schema=response_schema,
                 )
-                
+
                 # Report which provider and model was used
                 model_name = getattr(client, "model", getattr(client, "model_name", "unknown"))
                 self.last_used_model = f"{provider_name}/{model_name}"
                 return response
 
             except (
-                MistralRateLimitError, GeminiRateLimitError, 
-                MistralServiceUnavailableError, GeminiServiceUnavailableError, 
-                GenerationTimeoutError, MistralAuthError, MissingAPIKeyError
+                MistralRateLimitError,
+                GeminiRateLimitError,
+                MistralServiceUnavailableError,
+                GeminiServiceUnavailableError,
+                GenerationTimeoutError,
+                MistralAuthError,
+                MistralTierError,
+                ModelUnavailableError,
+                MissingAPIKeyError,
+                GenerationError,
             ) as e:
-                # Fall through to next provider
                 last_error = e
-                err_str = str(e).lower()
-                reason = "rate_limited" if "rate" in err_str else ("service_unavailable" if "unavailable" in err_str else ("timeout" if "time" in err_str else "auth_error"))
-                error_reasons.append(f"{provider_name}: {reason}")
-                
-                if len(providers) > 1 and provider_name == providers[0][0]:
-                    logger.warning(f"[LLM] {provider_name} failed ({reason}), trying {providers[1][0]}")
 
-        # If we exited the loop, it means all providers failed or we hit the total deadline
+                # Determine concise, sanitized reason
+                if isinstance(e, MistralTierError) or "tier_not_allowed" in str(e).lower():
+                    reason = "tier_not_allowed"
+                elif isinstance(e, (MistralRateLimitError, GeminiRateLimitError)) or "rate" in str(e).lower():
+                    reason = "rate_limited"
+                elif isinstance(e, (MistralServiceUnavailableError, GeminiServiceUnavailableError)) or "unavailable" in str(e).lower():
+                    reason = "service_unavailable"
+                elif isinstance(e, GenerationTimeoutError) or "timeout" in str(e).lower() or "deadline" in str(e).lower():
+                    reason = "timeout"
+                elif isinstance(e, MistralAuthError) or "auth" in str(e).lower():
+                    reason = "auth_error"
+                elif isinstance(e, ModelUnavailableError):
+                    reason = "model_unavailable"
+                elif isinstance(e, MissingAPIKeyError):
+                    reason = "missing_key"
+                else:
+                    reason = "failed"
+
+                error_reasons.append(f"{provider_name}: {reason}")
+
+                if len(providers) > 1 and provider_name == providers[0][0]:
+                    logger.warning("[LLM] %s failed (%s), trying %s", provider_name, reason, providers[1][0])
+
+        # If we exited the loop, all attempted providers failed or total deadline was hit
         if last_error:
-            # Append combined reasons to the exception message so answer_generator can pull it
             combined_reason = "; ".join(error_reasons)
             if combined_reason:
                 last_error.args = (f"{last_error.args[0]} ({combined_reason})",) + last_error.args[1:]

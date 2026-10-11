@@ -30,8 +30,6 @@ def smoke_environment(tmp_path_factory):
     def _mock_gen(prompt, system_instruction=None, **kwargs):
         p_lower = prompt.lower()
         if "pre-existing" in p_lower or "36 months" in p_lower:
-            if "translate to tamil" in p_lower or "பாலிசி சான்றுகள்" in p_lower:
-                return "முன்பே இருக்கும் நோய்களுக்கான காத்திருப்பு காலம் 36 months (முப்பத்தாறு மாதங்கள்) ஆகும்."
             return "The waiting period for pre-existing diseases is 36 months of continuous coverage."
         if "room rent" in p_lower:
             return "Room rent is limited up to 1% of the Sum Insured per day."
@@ -131,22 +129,22 @@ def test_smoke_4_ask_maternity_expenses(smoke_environment):
     assert "maternity is excluded" not in ans.answer.lower()
 
 
-def test_smoke_5_ask_in_tamil(smoke_environment):
-    """Smoke Test 5: Ask in Tamil -> Tamil answer, 36-month fact preserved, Page 2 citation."""
+def test_smoke_5_ask_pre_existing_disease(smoke_environment):
+    """Smoke Test 5: Ask pre-existing disease waiting period -> English answer, 36-month fact preserved, Page 2 citation."""
     env = smoke_environment
     doc = env["doc_health"]
-    tamil_query = "ஏற்கனவே உள்ள நோய்களுக்கான காத்திருப்பு காலம் என்ன?"
+    query = "What is the waiting period for pre-existing diseases?"
 
     ans = answer_policy_question(
         doc_id=doc.doc_id,
-        query=tamil_query,
-        language="ta",
+        query=query,
+        language="en",
         retriever_instance=env["retriever"],
         validator_instance=env["validator"],
         generator_instance=env["generator"],
     )
 
-    assert ans.language == "ta"
+    assert ans.language == "en"
     assert ans.evidence_status == EvidenceStatus.SUFFICIENT
     assert "36" in ans.answer
     assert len(ans.citations) >= 1

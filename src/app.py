@@ -155,8 +155,8 @@ def answer_policy_question(
 
     Args:
         doc_id: Active policy document ID.
-        query: User question in English or Tamil.
-        language: 'en' for English, 'ta' for Tamil.
+        query: User question in English.
+        language: 'en' for English.
         retriever_instance: Optional custom Retriever.
         validator_instance: Optional custom EvidenceValidator.
         generator_instance: Optional custom AnswerGenerator.
@@ -476,17 +476,6 @@ def main() -> None:
                     logger.error("Error processing uploaded PDF: %s", e)
                     st.error(f"Failed to process policy: {str(e)}")
 
-        # Language Selection
-        st.divider()
-        st.subheader("🌐 Answer Language")
-        lang_choice = st.radio(
-            "Select language:",
-            ["English", "தமிழ் (Tamil)"],
-            index=0,
-            horizontal=True,
-        )
-        selected_language = "ta" if "Tamil" in lang_choice else "en"
-
         # Active Policy Metadata Card
         st.divider()
         st.subheader("📄 Active Policy Information")
@@ -525,7 +514,7 @@ def main() -> None:
 
     # Main Area: Chat & Question Interface
     st.header("📋 Insurance Policy Explainer")
-    st.caption("Ask questions in English or Tamil, or scan for important policy restrictions and exclusions.")
+    st.caption("Ask questions about policy coverage, or scan for important policy restrictions and exclusions.")
 
     if active_doc is None:
         st.info("👈 Please upload an insurance policy PDF in the sidebar to get started.")
@@ -535,7 +524,6 @@ def main() -> None:
             - **Strict Grounding:** Answers are generated exclusively from your uploaded policy clauses.
             - **Zero Hallucination:** Never guesses or assumes unwritten terms.
             - **Page Citations:** Every claim links directly to the source page and clause.
-            - **Bilingual:** Ask and receive answers in either English or Tamil.
             - **Red-Flag Scanner:** Identifies waiting periods, exclusions, co-payments, room-rent limits, and sub-limits.
             """
         )
@@ -558,7 +546,7 @@ def main() -> None:
 
     with tab_chat:
         # Render Chat History
-        for chat_item in st.session_state.chat_history:
+        for idx, chat_item in enumerate(st.session_state.chat_history):
             with st.chat_message("user"):
                 st.write(chat_item["query"])
 
@@ -566,12 +554,30 @@ def main() -> None:
                 grounded_ans: GroundedAnswer = chat_item["answer"]
                 if getattr(grounded_ans, "llm_unavailable", False):
                     reason = getattr(grounded_ans, "llm_unavailable_reason", "Timeout or quota exceeded")
-                    st.warning(f"Language model unavailable ({reason})")
+                    st.warning(
+                        "⚠️ **Answer generation is temporarily unavailable.** "
+                        "The policy passages were retrieved successfully, but the configured language models did not return a response. "
+                        "Your uploaded policy and saved index remain intact."
+                    )
+                    if reason:
+                        st.caption(f"Provider status: {reason}")
+                    st.markdown("### 📄 Retrieved Policy Passages (Reference Only)")
+                    st.caption("These excerpts were retrieved from your policy, but final answer synthesis could not be generated.")
                     ans_text = grounded_ans.answer.strip()
                     if not ans_text:
                         ans_text = "\n\n".join(f"- {c.source_snippet}" for c in grounded_ans.citations)
-                    st.markdown(f"**Retrieved Sources:**\n\n{ans_text}")
+                    st.markdown(ans_text)
                     render_citations(grounded_ans.citations)
+
+                    if st.button("🔄 Retry Answer Generation", key=f"retry_history_{idx}"):
+                        with st.spinner("Retrying answer generation..."):
+                            retry_ans = answer_policy_question(
+                                doc_id=active_doc.doc_id,
+                                query=chat_item["query"],
+                                language="en",
+                            )
+                            st.session_state.chat_history[idx]["answer"] = retry_ans
+                            st.rerun()
                 else:
                     render_evidence_status_badge(grounded_ans.evidence_status, grounded_ans.confidence)
                     st.markdown(grounded_ans.answer)
@@ -594,19 +600,42 @@ def main() -> None:
                     try:
                         with timed("Total time per question"):
                             grounded_ans = answer_policy_question(
-                            doc_id=active_doc.doc_id,
-                            query=query,
-                            language=selected_language,
-                        )
+                                doc_id=active_doc.doc_id,
+                                query=query,
+                                language="en",
+                            )
 
                         if getattr(grounded_ans, "llm_unavailable", False):
                             reason = getattr(grounded_ans, "llm_unavailable_reason", "Timeout or quota exceeded")
-                            st.warning(f"Language model unavailable ({reason})")
+                            st.warning(
+                                "⚠️ **Answer generation is temporarily unavailable.** "
+                                "The policy passages were retrieved successfully, but the configured language models did not return a response. "
+                                "Your uploaded policy and saved index remain intact."
+                            )
+                            if reason:
+                                st.caption(f"Provider status: {reason}")
+                            st.markdown("### 📄 Retrieved Policy Passages (Reference Only)")
+                            st.caption("These excerpts were retrieved from your policy, but final answer synthesis could not be generated.")
                             ans_text = grounded_ans.answer.strip()
                             if not ans_text:
                                 ans_text = "\n\n".join(f"- {c.source_snippet}" for c in grounded_ans.citations)
-                            st.markdown(f"**Retrieved Sources:**\n\n{ans_text}")
+                            st.markdown(ans_text)
                             render_citations(grounded_ans.citations)
+
+                            new_idx = len(st.session_state.chat_history)
+                            if st.button("🔄 Retry Answer Generation", key=f"retry_active_{new_idx}"):
+                                with st.spinner("Retrying answer generation..."):
+                                    retry_ans = answer_policy_question(
+                                        doc_id=active_doc.doc_id,
+                                        query=query,
+                                        language="en",
+                                    )
+                                    st.session_state.chat_history.append({
+                                        "query": query,
+                                        "answer": retry_ans,
+                                        "language": "en",
+                                    })
+                                    st.rerun()
                         else:
                             render_evidence_status_badge(grounded_ans.evidence_status, grounded_ans.confidence)
                             st.markdown(grounded_ans.answer)
@@ -619,7 +648,7 @@ def main() -> None:
                         st.session_state.chat_history.append({
                             "query": query,
                             "answer": grounded_ans,
-                            "language": selected_language,
+                            "language": "en",
                         })
 
                     except MissingAPIKeyError:

@@ -1,4 +1,4 @@
-"""Deterministic Evaluation Runner for Insurance Policy Explainer (Phase 7).
+"""Deterministic Evaluation Runner for Insurance Policy Explainer.
 
 Evaluates:
 1. Retrieval Recall@1, Recall@3, Recall@5
@@ -6,7 +6,7 @@ Evaluates:
 3. Citation Correctness & Provenance
 4. Numeric Accuracy
 5. Controlled Abstention Accuracy
-6. Tamil Query & Numeric Preservation
+6. Dataset Scale & Category Balance
 7. Two-Policy Comparison Engine Invariants
 8. Red-Flag Scanner Category & Severity Coverage
 9. OCR / Scanned PDF Graceful Failure Path
@@ -84,9 +84,11 @@ class EvaluationRunner:
         return doc, chunks
 
     def evaluate_qa_cases(self, cases: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Evaluate direct factual, numeric, conditional, negative, unanswerable, conflicting, and Tamil cases."""
+        """Evaluate direct factual, numeric, conditional, negative, unanswerable, and conflicting cases."""
         metrics = {
             "total_qa_cases": len(cases),
+            "answerable_cases_count": sum(1 for c in cases if not c.get("should_abstain", False)),
+            "unanswerable_cases_count": sum(1 for c in cases if c.get("should_abstain", False)),
             "recall_at_1_hits": 0,
             "recall_at_3_hits": 0,
             "recall_at_5_hits": 0,
@@ -98,8 +100,6 @@ class EvaluationRunner:
             "numeric_eval_count": 0,
             "abstention_matches": 0,
             "abstention_eval_count": 0,
-            "tamil_hits": 0,
-            "tamil_eval_count": 0,
             "details": [],
         }
 
@@ -157,8 +157,10 @@ class EvaluationRunner:
                 metrics["numeric_eval_count"] += 1
                 combined_text = " ".join([r.text for r in results])
                 for exp_num in expected_numbers:
-                    val_str = str(exp_num["value"])
-                    if val_str not in combined_text:
+                    val = exp_num["value"]
+                    val_str = str(val)
+                    val_comma = f"{val:,}" if isinstance(val, (int, float)) else val_str
+                    if val_str not in combined_text and val_comma not in combined_text:
                         num_match = False
                 if num_match:
                     metrics["numeric_matches"] += 1
@@ -172,15 +174,6 @@ class EvaluationRunner:
                     abstain_match = False
                 if abstain_match:
                     metrics["abstention_matches"] += 1
-
-            # 6. Tamil Evaluation
-            tamil_match = True
-            if lang == "ta":
-                metrics["tamil_eval_count"] += 1
-                if not r5_hit or evidence.status != EvidenceStatus.SUFFICIENT:
-                    tamil_match = False
-                if tamil_match:
-                    metrics["tamil_hits"] += 1
 
             case_passed = suff_match and (r5_hit if expected_pages else True) and (abstain_match if should_abstain else True)
             metrics["details"].append({
@@ -323,11 +316,12 @@ class EvaluationRunner:
         citation_acc = qa_metrics["citation_valid_count"] / max(qa_metrics["citation_eval_count"], 1)
         numeric_acc = qa_metrics["numeric_matches"] / max(qa_metrics["numeric_eval_count"], 1)
         abstention_acc = qa_metrics["abstention_matches"] / max(qa_metrics["abstention_eval_count"], 1)
-        tamil_acc = qa_metrics["tamil_hits"] / max(qa_metrics["tamil_eval_count"], 1)
         comp_acc = comp_metrics["dimension_matches"] / max(comp_metrics["total_dimensions_evaluated"], 1)
 
         summary = {
             "qa_cases_count": qa_metrics["total_qa_cases"],
+            "answerable_cases_count": qa_metrics["answerable_cases_count"],
+            "unanswerable_cases_count": qa_metrics["unanswerable_cases_count"],
             "recall_at_1": round(recall_at_1_rate * 100, 2),
             "recall_at_3": round(recall_at_3_rate * 100, 2),
             "recall_at_5": round(recall_at_5_rate * 100, 2),
@@ -335,7 +329,6 @@ class EvaluationRunner:
             "citation_correctness": round(citation_acc * 100, 2),
             "numeric_accuracy": round(numeric_acc * 100, 2),
             "abstention_accuracy": round(abstention_acc * 100, 2),
-            "tamil_accuracy": round(tamil_acc * 100, 2),
             "comparison_dimension_accuracy": round(comp_acc * 100, 2),
             "comparison_isolation_verified": comp_metrics["isolation_verified"],
             "risk_scanner_status": scanner_metrics["status"],

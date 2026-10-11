@@ -1,4 +1,4 @@
-"""Unit tests for multilingual Embedder module."""
+"""Unit tests for Embedder module."""
 
 import numpy as np
 import pytest
@@ -94,31 +94,22 @@ def test_deterministic_encoding(shared_embedder):
     assert np.allclose(v1, v2, atol=1e-6)
 
 
-def test_multilingual_compatibility_smoke_test(shared_embedder):
+def test_semantic_discrimination_smoke_test(shared_embedder):
     """
-    Multilingual compatibility test:
-    Verify that an English policy clause has higher cosine similarity
-    with an equivalent Tamil query than with an unrelated English statement.
+    Semantic discrimination test:
+    Verify that an English policy clause has significantly higher cosine similarity
+    with an equivalent English query than with an unrelated statement.
     """
-    # English clause
     en_clause = "Diabetes has a waiting period of 36 months of continuous coverage."
-    # Tamil equivalent: நீரிழிவு நோய்க்கான காத்திருப்பு காலம் 36 மாதங்கள் ஆகும்.
-    ta_query = "நீரிழிவு நோய்க்கான காத்திருப்பு காலம் 36 மாதங்கள்"
-    # Unrelated English text
+    en_query = "What is the waiting period for diabetes?"
     unrelated = "The automobile was repaired at an authorized garage yesterday afternoon."
 
-    v_en = shared_embedder.embed_query(en_clause)
-    v_ta = shared_embedder.embed_query(ta_query)
-    v_unrelated = shared_embedder.embed_query(unrelated)
+    v_clause = shared_embedder.embed_texts([en_clause])[0]
+    v_query = shared_embedder.embed_query(en_query)
+    v_unrelated = shared_embedder.embed_texts([unrelated])[0]
 
-    sim_ta = float(np.dot(v_en, v_ta))
-    sim_unrelated = float(np.dot(v_en, v_unrelated))
+    sim_query = float(np.dot(v_clause, v_query))
+    sim_unrelated = float(np.dot(v_clause, v_unrelated))
 
-    if "multilingual" in shared_embedder.model_name.lower():
-        assert sim_ta > sim_unrelated, f"Tamil similarity ({sim_ta:.3f}) should exceed unrelated ({sim_unrelated:.3f})"
-    else:
-        en_query = "What is the waiting period for diabetes?"
-        v_q = shared_embedder.embed_query(en_query)
-        sim_q = float(np.dot(v_en, v_q))
-        assert sim_q > sim_unrelated, f"Related query ({sim_q:.3f}) should exceed unrelated ({sim_unrelated:.3f})"
-    assert sim_ta > 0.40, f"Cross-lingual similarity ({sim_ta:.3f}) should be positive and substantial"
+    assert sim_query > sim_unrelated, f"Relevant similarity ({sim_query:.3f}) should exceed unrelated ({sim_unrelated:.3f})"
+    assert sim_query > 0.50, f"Relevant semantic similarity ({sim_query:.3f}) should be high"

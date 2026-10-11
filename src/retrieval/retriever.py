@@ -16,45 +16,45 @@ logger = get_logger(__name__)
 # Specific concept keyword families: distinguishing terms for specific clauses/conditions
 SPECIFIC_CONCEPT_FAMILIES = {
     "pre_existing": [
-        "pre-existing", "pre existing", "ped", "ஏற்கனவே உள்ள", "முந்தைய நோய்"
+        "pre-existing", "pre existing", "ped"
     ],
     "specific_illness": [
         "specific disease", "specific illness", "specific illnesses", "specific",
-        "specified procedures", "cataract", "குறிப்பிட்ட நோய்", "குறிப்பிட்ட நோய்கள்"
+        "specified procedures", "cataract"
     ],
     "initial_waiting": [
-        "initial waiting", "30 days", "ஆரம்ப காத்திருப்பு"
+        "initial waiting", "30 days"
     ],
     "co_pay": [
-        "co-pay", "copay", "co-payment", "copayment", "coinsurance", "இணை கட்டணம்", "இணைக்கட்டணம்"
+        "co-pay", "copay", "co-payment", "copayment", "coinsurance"
     ],
     "room_rent": [
-        "room rent", "icu charges", "icu", "அறை வாடகை", "அறை கட்டணம்"
+        "room rent", "icu charges", "icu"
     ],
     "sub_limit": [
-        "sub-limit", "sublimit", "capped at", "limit per", "உள் வரம்பு"
+        "sub-limit", "sublimit", "capped at", "limit per"
     ],
     "deductible": [
-        "deductible", "விலக்குத் தொகை"
+        "deductible"
     ],
     "maternity": [
-        "maternity", "newborn", "pregnancy", "பிரசவம்"
+        "maternity", "newborn", "pregnancy"
     ],
     "sum_insured": [
-        "sum insured", "coverage amount", "policy limit", "காப்பீட்டுத் தொகை"
+        "sum insured", "coverage amount", "policy limit"
     ],
     "age_limit": [
-        "entry age", "maximum age", "minimum age", "age limit", "age criteria", "18 years", "65 years", "வயது வரம்பு", "வயது"
+        "entry age", "maximum age", "minimum age", "age limit", "age criteria", "18 years", "65 years"
     ],
 }
 
 # General domain terms
 GENERAL_DOMAIN_FAMILIES = {
     "waiting_period": [
-        "waiting period", "initial waiting", "waiting", "காத்திருப்பு காலம்", "காத்திருப்புக் காலம்"
+        "waiting period", "initial waiting", "waiting"
     ],
     "exclusion": [
-        "exclusion", "exclusions", "excluded", "permanent exclusion", "விலக்கு", "விலக்குகள்"
+        "exclusion", "exclusions", "excluded", "permanent exclusion"
     ],
 }
 
@@ -62,16 +62,15 @@ GENERAL_DOMAIN_FAMILIES = {
 TABLE_QUERY_SIGNALS = [
     "room rent", "rent", "limit", "amount", "co-pay", "copay", "copayment",
     "percentage", "percent", "%", "₹", "rs", "inr", "charges", "share",
-    "deductible", "schedule", "benefit", "table", "rate", "fee",
-    "வரம்பு", "வாடகை", "கட்டணம்", "அட்டவணை", "விழுக்காடு", "சதவீதம்"
+    "deductible", "schedule", "benefit", "table", "rate", "fee"
 ]
 
 
 class Retriever:
     """
     Production-grade hybrid retriever combining:
-    1. Local multilingual MPNet embeddings (English & Tamil)
-    2. Exact FAISS IndexFlatIP cosine similarity
+    1. Dense vector embeddings (Snowflake Arctic Embed XS)
+    2. Vector cosine similarity search
     3. Transparent, bounded keyword and numeric signal boosting
     """
 
@@ -142,8 +141,8 @@ class Retriever:
         Retrieve and rank candidate chunks for a query from a specific document.
 
         Args:
-            doc_id: Foreign key to document FAISS index.
-            query: User question in English or Tamil.
+            doc_id: Foreign key to document index.
+            query: User question in English.
             top_k: Number of final results to return (defaults to RETRIEVAL_FINAL_K).
 
         Returns:

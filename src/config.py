@@ -63,16 +63,15 @@ class AppConfig:
 
     # Gemini Settings (Phase 4)
     GEMINI_API_KEY: Optional[str] = os.getenv("GEMINI_API_KEY", None)
-    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
-    GEMINI_TIMEOUT_SECONDS: int = int(os.getenv("GEMINI_TIMEOUT_SECONDS", "30"))
+    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
+    GEMINI_TIMEOUT_SECONDS: int = int(os.getenv("GEMINI_TIMEOUT_SECONDS", "15"))
     LLM_REQUEST_TIMEOUT_SECONDS: int = int(os.getenv("LLM_REQUEST_TIMEOUT_SECONDS", "15"))
-    LLM_TOTAL_DEADLINE_SECONDS: int = int(os.getenv("LLM_TOTAL_DEADLINE_SECONDS", "40"))
+    LLM_TOTAL_DEADLINE_SECONDS: int = int(os.getenv("LLM_TOTAL_DEADLINE_SECONDS", "30"))
     GEMINI_TEMPERATURE: float = float(os.getenv("GEMINI_TEMPERATURE", "0.0"))
 
     # Mistral Settings
     MISTRAL_API_KEY: Optional[str] = os.getenv("MISTRAL_API_KEY", None)
-    MISTRAL_MODEL: str = os.getenv("MISTRAL_MODEL", "mistral-small-latest")
-    TAMIL_GENERATION_MODE: str = os.getenv("TAMIL_GENERATION_MODE", "translation")
+    MISTRAL_MODEL: str = os.getenv("MISTRAL_MODEL", "ministral-8b-latest")
 
 
     # Logging

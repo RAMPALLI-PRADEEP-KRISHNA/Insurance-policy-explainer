@@ -245,8 +245,8 @@ class Citation(BaseModel):
 class GroundedAnswer(BaseModel):
     """Canonical final answer grounded strictly in verified policy evidence."""
     query: str = Field(..., description="Original user query")
-    answer: str = Field(..., description="Grounded answer text in plain English or Tamil")
-    language: str = Field(default="en", description="Language code: 'en' or 'ta'")
+    answer: str = Field(..., description="Grounded answer text in plain English")
+    language: str = Field(default="en", description="Language code: 'en'")
     evidence_status: EvidenceStatus = Field(..., description="Validated evidence state")
     citations: List[Citation] = Field(default_factory=list, description="Authoritative citations derived from chunk metadata")
     supporting_chunk_ids: List[str] = Field(default_factory=list, description="IDs of chunks directly supporting the answer")

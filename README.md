@@ -14,7 +14,7 @@ two-policy comparison.
 ## Features
 
 - **Upload & Parse** — Upload insurance policy PDFs; scanned documents are handled via OCR fallback.
-- **Ask Questions** — Ask questions in English or Tamil; answers are grounded strictly in the uploaded policy.
+- **Ask Questions** — Ask questions in English; answers are grounded strictly in the uploaded policy.
 - **Page-Level Citations** — Every answer includes verifiable page numbers sourced from document metadata.
 - **Source Text Display** — See the exact policy text used to generate each answer.
 - **Abstention** — When the policy doesn't contain enough information, the system says so instead of guessing.
@@ -31,10 +31,10 @@ The application is built from explicit Python modules — no LangChain or LlamaI
 
 ```
 Upload → PDF Extraction (PyMuPDF + OCR fallback) → Chunking (table/section preserved)
-       → Embedding (sentence-transformers) → Per-document FAISS Index (IndexFlatIP)
+       → Embedding (FastEmbed Arctic Embed XS) → Persistent Local Qdrant Index
 
-Query  → Embedding → FAISS Search (top-10) → Keyword Boost (numeric & clause signals)
-       → Evidence Validation (4-state) → Gemini API (google-genai)
+Query  → Embedding → Vector Search (top-10) → Keyword Boost (numeric & clause signals)
+       → Evidence Validation (4-state) → Mistral/Gemini LLM Provider Chain
        → Citation Assembly (metadata only) → Answer (grounded + disclaimer)
 ```
 
@@ -47,14 +47,14 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the full design.
 | Component | Technology |
 |---|---|
 | UI | Streamlit |
-| PDF Extraction | PyMuPDF (fitz) with table detection |
+| PDF Extraction | PyMuPDF with table detection |
 | OCR Fallback | pytesseract + Pillow (requires system Tesseract) |
-| Embeddings | sentence-transformers (`paraphrase-multilingual-mpnet-base-v2`) |
-| Vector Search | FAISS CPU (`IndexFlatIP`, cosine similarity via normalized vectors) |
-| Scoring/Boost | Keyword signal boosting (numerics, risk terms; cross-encoder optional post-MVP) |
-| LLM | Google Gemini API via official **`google-genai`** SDK |
+| Embeddings | FastEmbed (`snowflake/snowflake-arctic-embed-xs` via ONNX Runtime) |
+| Vector Search | Qdrant Client (persistent local disk storage) |
+| Scoring/Boost | Keyword signal boosting (numerics, risk terms, tables) |
+| LLM | Mistral API (primary) with Google Gemini fallback |
 | Data Models | Pydantic v2 |
-| Evaluation | pandas + ROUGE + custom multi-dimensional metrics |
+| Evaluation | Deterministic evaluation suite with ground-truth citations |
 | Tests | pytest + pytest-cov |
 
 ---

@@ -180,10 +180,10 @@ class Embedder:
         clean_query = query.strip()
         self.load()
 
-        # Snowflake Arctic Embed models require query instruction prefix for English queries
+        # Snowflake Arctic Embed models require query instruction prefix for queries
         q_text = (
             f"Represent this sentence for searching relevant passages: {clean_query}"
-            if "arctic-embed" in self.model_name and clean_query.isascii()
+            if "arctic-embed" in self.model_name
             else clean_query
         )
 
