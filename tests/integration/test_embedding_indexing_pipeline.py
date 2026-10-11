@@ -41,7 +41,7 @@ def test_end_to_end_embedding_and_faiss_smoke_test(tmp_path):
 
     assert meta.document_id == document.doc_id
     assert meta.chunk_count == len(chunks)
-    assert meta.embedding_dimension == 768
+    assert meta.embedding_dimension == embedder.dimension
 
     # Step 4: Search for waiting period
     query = "What is the waiting period for pre-existing diseases?"

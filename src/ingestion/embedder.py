@@ -1,4 +1,12 @@
-"""Multilingual embedding module for insurance policy chunks and queries."""
+"""Embedding module for insurance policy chunks and queries.
+
+Supports:
+1. FastEmbed with snowflake/snowflake-arctic-embed-xs (384-dim, high-throughput CPU inference)
+2. SentenceTransformers with paraphrase-multilingual-mpnet-base-v2 (768-dim, multilingual fallback)
+
+Implements lazy-loading, singleton reuse, batch encoding, L2-normalization,
+and strict dimension/finite validation.
+"""
 
 import time
 from typing import List, Optional, Union
@@ -12,17 +20,19 @@ from src.utils.logging_utils import logger
 
 class Embedder:
     """
-    Manages loading and inference for the multilingual embedding model.
-    Implements lazy-loading, batch encoding, L2-normalization, and dimension validation.
+    Manages loading and inference for document and query embedding models.
+    Supports FastEmbed (primary) and SentenceTransformers (fallback).
     """
 
     def __init__(
         self,
         model_name: str = config.EMBEDDING_MODEL_NAME,
+        backend: str = config.EMBEDDING_BACKEND,
         device: str = config.EMBEDDING_DEVICE,
         batch_size: int = config.EMBEDDING_BATCH_SIZE,
     ):
         self.model_name = model_name
+        self.backend = backend.lower()
         self.device = device
         self.batch_size = batch_size
         self._model = None
@@ -30,39 +40,53 @@ class Embedder:
 
     @property
     def is_loaded(self) -> bool:
-        """Check if the underlying sentence-transformers model is loaded in memory."""
+        """Check if the underlying model is loaded in memory."""
         return self._model is not None
 
     @property
     def dimension(self) -> int:
         """Return embedding vector dimension."""
-        if self._model is not None:
-            if hasattr(self._model, "get_embedding_dimension"):
-                return self._model.get_embedding_dimension()
-            elif hasattr(self._model, "get_sentence_embedding_dimension"):
-                return self._model.get_sentence_embedding_dimension()
         return self._dimension
 
     def load(self) -> None:
         """
-        Lazily load the sentence-transformers model.
+        Lazily load the embedding model runtime.
         Does nothing if already loaded.
         """
         if self._model is not None:
             print("[TIMING] embedding model acquisition: model reused")
             return
 
-        logger.info("Loading embedding model '%s' on device '%s'...", self.model_name, self.device)
+        logger.info(
+            "Loading embedding model '%s' via backend '%s'...",
+            self.model_name,
+            self.backend,
+        )
         t0 = time.time()
         try:
-            from sentence_transformers import SentenceTransformer
-            self._model = SentenceTransformer(self.model_name, device=self.device)
-            if hasattr(self._model, "get_embedding_dimension"):
-                self._dimension = self._model.get_embedding_dimension()
+            if self.backend == "fastembed":
+                from fastembed import TextEmbedding
+                self._model = TextEmbedding(model_name=self.model_name)
+                # Verify dimension with a lightweight probe if needed
+                test_vec = list(self._model.embed(["probe"]))[0]
+                self._dimension = len(test_vec)
             else:
-                self._dimension = self._model.get_sentence_embedding_dimension()
+                from sentence_transformers import SentenceTransformer
+                self._model = SentenceTransformer(self.model_name, device=self.device)
+                if hasattr(self._model, "get_embedding_dimension"):
+                    self._dimension = self._model.get_embedding_dimension()
+                elif hasattr(self._model, "get_sentence_embedding_dimension"):
+                    self._dimension = self._model.get_sentence_embedding_dimension()
+                else:
+                    self._dimension = config.EMBEDDING_DIM
+
             elapsed = time.time() - t0
-            logger.info("Embedding model loaded successfully in %.2fs (dim=%d)", elapsed, self._dimension)
+            logger.info(
+                "Embedding model loaded successfully in %.2fs (backend=%s, dim=%d)",
+                elapsed,
+                self.backend,
+                self._dimension,
+            )
             print(f"[TIMING] embedding model acquisition: model loaded in {elapsed:.4f} s")
         except Exception as e:
             logger.error("Failed to load embedding model '%s': %s", self.model_name, e)
@@ -84,7 +108,7 @@ class Embedder:
             np.ndarray of shape (len(texts), dimension) with dtype float32.
 
         Raises:
-            EmbeddingError on failure.
+            EmbeddingError on invalid input or failure.
         """
         if not isinstance(texts, list):
             raise EmbeddingError(f"Expected list of strings, got {type(texts)}")
@@ -97,17 +121,38 @@ class Embedder:
 
         bs = batch_size or self.batch_size
         t0 = time.time()
+
         try:
-            # sentence-transformers normalize_embeddings=True applies L2-normalization
-            embeddings = self._model.encode(
-                texts,
-                batch_size=bs,
-                normalize_embeddings=True,
-                convert_to_numpy=True,
-                show_progress_bar=False,
-            )
+            if self.backend == "fastembed":
+                # Handle possible empty strings safely by sanitizing
+                sanitized_texts = [t if t.strip() else " " for t in texts]
+                raw_embeddings = list(self._model.embed(sanitized_texts, batch_size=bs))
+                embeddings = np.array(raw_embeddings, dtype=np.float32)
+                # FastEmbed returns unit norm vectors for arctic, but ensure strict L2 norm
+                norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
+                norms[norms == 0] = 1.0
+                embeddings = embeddings / norms
+            else:
+                # sentence-transformers normalize_embeddings=True applies L2-normalization
+                embeddings = self._model.encode(
+                    texts,
+                    batch_size=bs,
+                    normalize_embeddings=True,
+                    convert_to_numpy=True,
+                    show_progress_bar=False,
+                )
+
             # Ensure float32 contiguous array
             embeddings = np.ascontiguousarray(embeddings, dtype=np.float32)
+
+            # Validation checks
+            if not np.all(np.isfinite(embeddings)):
+                raise EmbeddingError("Generated embeddings contain NaN or infinite values.")
+            if embeddings.shape[1] != self.dimension:
+                raise EmbeddingError(
+                    f"Generated dimension {embeddings.shape[1]} does not match expected {self.dimension}."
+                )
+
             elapsed = time.time() - t0
             logger.debug("Encoded %d texts in %.2fs (shape=%s)", len(texts), elapsed, embeddings.shape)
             return embeddings
@@ -132,9 +177,38 @@ class Embedder:
         if not isinstance(query, str) or not query.strip():
             raise EmbeddingError("Search query must be a non-empty string.")
 
-        # Embed as a single-element batch
-        vectors = self.embed_texts([query.strip()])
-        return vectors[0]
+        clean_query = query.strip()
+        self.load()
+
+        # Snowflake Arctic Embed models require query instruction prefix for English queries
+        q_text = (
+            f"Represent this sentence for searching relevant passages: {clean_query}"
+            if "arctic-embed" in self.model_name and clean_query.isascii()
+            else clean_query
+        )
+
+        try:
+            if self.backend == "fastembed":
+                raw = list(self._model.embed([q_text]))[0]
+                q_vec = np.array(raw, dtype=np.float32)
+                norm = np.linalg.norm(q_vec)
+                if norm > 0:
+                    q_vec = q_vec / norm
+            else:
+                # Embed as a single-element batch
+                vectors = self.embed_texts([q_text])
+                q_vec = vectors[0]
+
+            if not np.all(np.isfinite(q_vec)):
+                raise EmbeddingError("Query vector contains NaN or infinite values.")
+            if len(q_vec) != self.dimension:
+                raise EmbeddingError(f"Query vector dimension {len(q_vec)} != expected {self.dimension}.")
+
+            return np.ascontiguousarray(q_vec, dtype=np.float32)
+
+        except Exception as e:
+            logger.error("Query embedding failed: %s", e)
+            raise EmbeddingError(f"Query embedding failed: {str(e)}")
 
     def embed_chunks(
         self,
@@ -142,7 +216,7 @@ class Embedder:
         batch_size: Optional[int] = None,
     ) -> np.ndarray:
         """
-        Extract canonical texts from chunks, encode them, and optionally attach to Chunk.embedding.
+        Extract canonical texts from chunks, encode them, and attach to Chunk.embedding.
 
         Returns:
             np.ndarray of shape (len(chunks), dimension).
@@ -162,4 +236,3 @@ class Embedder:
 
 # Singleton instance
 embedder = Embedder()
-

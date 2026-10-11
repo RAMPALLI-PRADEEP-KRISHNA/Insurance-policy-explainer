@@ -115,12 +115,13 @@ class Retriever:
                     signals["specific_concept"] = self.config.KEYWORD_BOOST_RISK
                     break
 
-        # 3. General Domain Match
-        for _, keywords in GENERAL_DOMAIN_FAMILIES.items():
-            if any(kw in q_norm or kw in q_lower for kw in keywords):
-                if any(kw in scope_norm or kw in full_chunk_scope for kw in keywords):
-                    signals["general_domain"] = 0.05
-                    break
+        # 3. General Domain Match (apply only to content chunks, not isolated headings)
+        if chunk.chunk_type != ChunkType.HEADING:
+            for _, keywords in GENERAL_DOMAIN_FAMILIES.items():
+                if any(kw in q_norm or kw in q_lower for kw in keywords):
+                    if any(kw in scope_norm or kw in full_chunk_scope for kw in keywords):
+                        signals["general_domain"] = 0.05
+                        break
 
         # 4. Table Signal
         if chunk.chunk_type == ChunkType.TABLE:
@@ -205,8 +206,11 @@ class Retriever:
                 )
             )
 
-        # 5. Sort by final_score descending (tie-breaker: vector_score descending)
-        scored_results.sort(key=lambda r: (r.final_score, r.vector_score), reverse=True)
+        # 5. Sort by final_score descending (tie-breakers: substantive content over pure heading, then vector_score)
+        scored_results.sort(
+            key=lambda r: (r.final_score, 1 if r.chunk.chunk_type != ChunkType.HEADING else 0, r.vector_score),
+            reverse=True,
+        )
 
         # 6. Assign ordinal ranks and truncate to top_k
         final_results = scored_results[:final_k]

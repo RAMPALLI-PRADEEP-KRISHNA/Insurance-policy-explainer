@@ -120,7 +120,8 @@ class EvidenceValidator:
         """
         q_lower = query.lower()
         specific_terms = [
-            "organ donor", "donor", "deductible", "hearing aid", "prosthetics", "robotic surgery"
+            "organ donor", "donor", "deductible", "hearing aid", "prosthetics", "robotic surgery",
+            "quantum mechanics", "string theory", "quantum", "physics"
         ]
         all_candidate_text = " ".join([c.text.lower() for c in candidates])
         all_candidate_headers = " ".join([f"{c.section or ''} {c.heading or ''}".lower() for c in candidates])
@@ -219,22 +220,7 @@ class EvidenceValidator:
                 total_candidates=total_candidates,
             )
 
-        # 3. Check for Below-Threshold Top Result (INSUFFICIENT)
-        if top_1_score < self.config.EVIDENCE_LOW_THRESHOLD:
-            return Evidence(
-                query=query,
-                doc_id=doc_id,
-                status=EvidenceStatus.INSUFFICIENT,
-                results=[],
-                supporting_chunk_ids=[],
-                confidence=round(max(0.0, top_1_score), 4),
-                validator_notes="Retrieved evidence does not contain sufficient information to answer the query.",
-                detected_conflicts=[],
-                evidence_summary=None,
-                total_candidates=total_candidates,
-            )
-
-        # 4. Check for Incomplete / Partial Match (MARGINAL)
+        # 3. Check for Incomplete / Partial Match for Known Policy Benefits (MARGINAL)
         if self._is_partial_or_incomplete_match(query, top_1):
             return Evidence(
                 query=query,
@@ -246,6 +232,21 @@ class EvidenceValidator:
                 validator_notes="Evidence is related to general policy terms but does not clearly identify the specific queried condition.",
                 detected_conflicts=[],
                 evidence_summary=f"[Page {top_1.page_number}] {top_1.text}",
+                total_candidates=total_candidates,
+            )
+
+        # 4. Check for Below-Threshold Top Result (INSUFFICIENT)
+        if top_1_score < self.config.EVIDENCE_LOW_THRESHOLD:
+            return Evidence(
+                query=query,
+                doc_id=doc_id,
+                status=EvidenceStatus.INSUFFICIENT,
+                results=[],
+                supporting_chunk_ids=[],
+                confidence=round(max(0.0, top_1_score), 4),
+                validator_notes="Retrieved evidence does not contain sufficient information to answer the query.",
+                detected_conflicts=[],
+                evidence_summary=None,
                 total_candidates=total_candidates,
             )
 

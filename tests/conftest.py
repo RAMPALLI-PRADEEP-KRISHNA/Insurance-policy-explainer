@@ -91,6 +91,8 @@ def make_scanned_image_pdf():
 
 
 import os
+import tempfile
+from pathlib import Path
 
 @pytest.fixture(autouse=True)
 def disable_llm_for_tests(request, monkeypatch):
@@ -100,3 +102,6 @@ def disable_llm_for_tests(request, monkeypatch):
         monkeypatch.setenv("LLM_PROVIDER", "fake")
         from src.config import config
         monkeypatch.setattr(config, "LLM_PROVIDER", "fake")
+        test_qdrant = Path(tempfile.gettempdir()) / "insurance_test_qdrant_db"
+        test_qdrant.mkdir(parents=True, exist_ok=True)
+        monkeypatch.setattr(config, "QDRANT_STORAGE_PATH", test_qdrant)

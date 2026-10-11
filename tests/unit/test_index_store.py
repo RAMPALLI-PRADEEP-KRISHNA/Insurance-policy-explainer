@@ -13,8 +13,8 @@ from src.utils.exceptions import IndexNotFoundError, StaleIndexError, CorruptedI
 
 @pytest.fixture
 def temp_index_store(tmp_path):
-    """Create an IndexStore instance using a temporary directory."""
-    return IndexStore(indexes_dir=tmp_path / "indexes", embedder_instance=embedder)
+    """Create an IndexStore instance using a temporary directory with NumPy backend."""
+    return IndexStore(indexes_dir=tmp_path / "indexes", embedder_instance=embedder, backend="numpy")
 
 
 def make_dummy_document(doc_id: str, filename: str = "test.pdf", file_hash: str = "hash123") -> Document:
@@ -60,7 +60,7 @@ def test_build_and_search_index(temp_index_store):
     meta = temp_index_store.build_index(doc, chunks=chunks)
     assert meta.document_id == "doc-001"
     assert meta.chunk_count == 3
-    assert meta.embedding_dimension == 768
+    assert meta.embedding_dimension == embedder.dimension
     assert meta.index_type == "numpy_flat_ip"
 
     # Search for waiting period

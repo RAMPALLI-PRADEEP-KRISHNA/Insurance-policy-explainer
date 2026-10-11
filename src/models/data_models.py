@@ -151,9 +151,10 @@ class IndexMetadata(BaseModel):
     embedding_model: str = Field(..., description="Model identifier used for embedding")
     embedding_dimension: int = Field(..., ge=1, description="Vector dimension (e.g. 768)")
     normalized: bool = Field(default=True, description="Whether vectors are L2-normalized for cosine similarity")
-    index_type: str = Field(default="IndexFlatIP", description="FAISS index class identifier")
+    index_type: str = Field(default="qdrant_cosine", description="Vector index class identifier")
+    backend: str = Field(default="qdrant", description="Vector database backend (qdrant, numpy_flat_ip, IndexFlatIP)")
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    index_schema_version: str = Field(default="1", description="Index schema version")
+    index_schema_version: str = Field(default="2", description="Index schema version")
 
 
 class EvidenceStatus(str, Enum):

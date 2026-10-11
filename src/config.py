@@ -20,6 +20,7 @@ class AppConfig:
     INDEXES_DIR: Path = DATA_DIR / "indexes"
     DOCUMENTS_DIR: Path = DATA_DIR / "documents"
     LOGS_DIR: Path = PROJECT_ROOT / "logs"
+    QDRANT_STORAGE_PATH: Path = DATA_DIR / "qdrant_db"
 
     # Ingestion & PDF Limits
     MAX_PDF_PAGES: int = int(os.getenv("MAX_PDF_PAGES", "300"))
@@ -34,12 +35,15 @@ class AppConfig:
     MAX_CHUNK_CHARS: int = int(os.getenv("MAX_CHUNK_CHARS", "800"))
     OVERLAP_CHARS: int = int(os.getenv("OVERLAP_CHARS", "160"))
 
-    # Embedding & FAISS Index Configuration (Phase 2B)
-    EMBEDDING_MODEL_NAME: str = os.getenv("EMBEDDING_MODEL_NAME", "paraphrase-multilingual-mpnet-base-v2")
-    EMBEDDING_DIM: int = int(os.getenv("EMBEDDING_DIM", "768"))
+    # Vector Store & Embedding Configuration
+    VECTOR_STORE_BACKEND: str = os.getenv("VECTOR_STORE_BACKEND", "qdrant").lower()
+    QDRANT_COLLECTION_NAME: str = os.getenv("QDRANT_COLLECTION_NAME", "insurance_policy_chunks")
+    EMBEDDING_BACKEND: str = os.getenv("EMBEDDING_BACKEND", "fastembed").lower()
+    EMBEDDING_MODEL_NAME: str = os.getenv("EMBEDDING_MODEL_NAME", "snowflake/snowflake-arctic-embed-xs")
+    EMBEDDING_DIM: int = int(os.getenv("EMBEDDING_DIM", "384"))
     EMBEDDING_BATCH_SIZE: int = int(os.getenv("EMBEDDING_BATCH_SIZE", "32"))
     EMBEDDING_DEVICE: str = os.getenv("EMBEDDING_DEVICE", "cpu")
-    INDEX_SCHEMA_VERSION: str = "1"
+    INDEX_SCHEMA_VERSION: str = "2"
 
     # Retrieval Configuration (Phase 3)
     RETRIEVAL_CANDIDATE_K: int = int(os.getenv("RETRIEVAL_CANDIDATE_K", "10"))
@@ -82,6 +86,7 @@ class AppConfig:
         cls.INDEXES_DIR.mkdir(exist_ok=True)
         cls.DOCUMENTS_DIR.mkdir(exist_ok=True)
         cls.LOGS_DIR.mkdir(exist_ok=True)
+        cls.QDRANT_STORAGE_PATH.mkdir(parents=True, exist_ok=True)
 
 
 config = AppConfig()

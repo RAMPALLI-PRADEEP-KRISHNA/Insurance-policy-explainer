@@ -1,0 +1,23 @@
+{
+  "total_answerable": 20,
+  "english_total": 16,
+  "tamil_total": 4,
+  "mpnet": {
+    "all_r1": 0.95,
+    "all_r3": 1.0,
+    "all_r5": 1.0,
+    "english_r1": 1.0,
+    "english_r3": 1.0,
+    "tamil_r1": 0.75,
+    "tamil_r3": 1.0
+  },
+  "arctic_xs": {
+    "all_r1": 1.0,
+    "all_r3": 1.0,
+    "all_r5": 1.0,
+    "english_r1": 1.0,
+    "english_r3": 1.0,
+    "tamil_r1": 1.0,
+    "tamil_r3": 1.0
+  }
+}
