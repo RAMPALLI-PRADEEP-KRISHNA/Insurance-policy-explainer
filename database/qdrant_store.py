@@ -46,9 +46,20 @@ def _cleanup_qdrant_clients():
 atexit.register(_cleanup_qdrant_clients)
 
 
-def get_or_create_qdrant_client(storage_path: Path) -> QdrantClient:
-    """Return shared QdrantClient for a path within the process to prevent file lock contention."""
-    resolved = str(Path(storage_path).resolve())
+def get_or_create_qdrant_client(
+    storage_path: Optional[Path] = None,
+    url: Optional[str] = None,
+    api_key: Optional[str] = None,
+) -> QdrantClient:
+    """Return shared QdrantClient for a path or URL within the process."""
+    if url:
+        key = f"remote:{url}"
+        if key not in _QDRANT_CLIENT_REGISTRY:
+            _QDRANT_CLIENT_REGISTRY[key] = QdrantClient(url=url, api_key=api_key)
+        return _QDRANT_CLIENT_REGISTRY[key]
+
+    path = storage_path or config.QDRANT_STORAGE_PATH
+    resolved = str(Path(path).resolve())
     if resolved not in _QDRANT_CLIENT_REGISTRY:
         _QDRANT_CLIENT_REGISTRY[resolved] = QdrantClient(path=resolved)
     return _QDRANT_CLIENT_REGISTRY[resolved]
@@ -56,7 +67,7 @@ def get_or_create_qdrant_client(storage_path: Path) -> QdrantClient:
 
 class QdrantStore:
     """
-    Manages persistent local Qdrant vector storage with strict document isolation.
+    Manages persistent local or remote Qdrant vector storage with strict document isolation.
     """
 
     def __init__(
@@ -67,12 +78,16 @@ class QdrantStore:
         embedder_instance: Optional[Embedder] = None,
         schema_version: str = config.INDEX_SCHEMA_VERSION,
         client_instance: Optional[Any] = None,
+        url: Optional[str] = config.QDRANT_URL,
+        api_key: Optional[str] = config.QDRANT_API_KEY,
     ):
         self.storage_path = Path(storage_path)
         self.indexes_dir = Path(indexes_dir)
         self.collection_base_name = collection_base_name
         self.embedder = embedder_instance or default_embedder
         self.schema_version = schema_version
+        self.url = url
+        self.api_key = api_key
         self.storage_path.mkdir(parents=True, exist_ok=True)
         self.indexes_dir.mkdir(parents=True, exist_ok=True)
 
@@ -81,9 +96,13 @@ class QdrantStore:
 
     @property
     def client(self) -> QdrantClient:
-        """Lazily initialize persistent local QdrantClient via process registry."""
+        """Lazily initialize persistent QdrantClient via process registry."""
         if self._client is None:
-            self._client = get_or_create_qdrant_client(self.storage_path)
+            self._client = get_or_create_qdrant_client(
+                storage_path=self.storage_path,
+                url=self.url,
+                api_key=self.api_key,
+            )
         return self._client
 
     def close(self) -> None:

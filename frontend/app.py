@@ -128,7 +128,7 @@ def process_uploaded_policy(
         with timed("chunking"):
             chunks = chunk_document(document)
             
-        with timed("FAISS build + persist"):
+        with timed("Vector index build + persist"):
             store.build_index(document, chunks=chunks, force_rebuild=True, progress_callback=progress_callback)
             
         elapsed = time.time() - t0
@@ -451,7 +451,7 @@ def main() -> None:
             def on_progress(processed, total):
                 progress_bar.progress(processed / total, text=f"Embedding chunks: {processed}/{total} (Elapsed: {time.time()-t0:.1f}s)")
 
-            with st.spinner("Processing policy document and building FAISS index..."):
+            with st.spinner("Processing policy document and building vector index..."):
                 try:
                     file_bytes = uploaded_file.read()
                     res = process_uploaded_policy(file_bytes, uploaded_file.name, progress_callback=on_progress)

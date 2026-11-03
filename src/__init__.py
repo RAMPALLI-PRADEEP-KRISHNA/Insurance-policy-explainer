@@ -1,0 +1,1 @@
+"""Source package compatibility shim."""

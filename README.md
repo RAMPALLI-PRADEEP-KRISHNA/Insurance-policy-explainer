@@ -176,14 +176,31 @@ Configure your `MISTRAL_API_KEY` and optionally `GEMINI_API_KEY` in `.env`.
 
 ---
 
-## Running the Application
+## Running the Application Locally
 
-Start the Streamlit web application:
+Start the Streamlit web application using either entry point:
 ```powershell
-.\.venv\Scripts\python.exe -m streamlit run frontend/app.py
+.\.venv\Scripts\python.exe -m streamlit run src/app.py
 ```
+*(Alternatively: `.\.venv\Scripts\python.exe -m streamlit run frontend/app.py`)*
 
 The application will open in your browser at `http://localhost:8501`.
+
+---
+
+## Deploying to Streamlit Community Cloud
+
+1. **Repository & Branch:** Select `main` (or `master`).
+2. **Main file path:** `src/app.py` (or `frontend/app.py`).
+3. **Python version:** `3.12`.
+4. **App Secrets (`Settings -> Secrets`):**
+   ```toml
+   MISTRAL_API_KEY = "your_actual_mistral_api_key"
+   GEMINI_API_KEY = "your_actual_gemini_api_key"
+   LLM_PROVIDER = "mistral"
+   LLM_FALLBACK_PROVIDER = "gemini"
+   ```
+5. Click **Deploy!** Local Qdrant vector storage initializes automatically in the container without requiring external databases.
 
 ---
 

@@ -335,6 +335,8 @@ class IndexStore:
                 indexes_dir=self.indexes_dir,
                 embedder_instance=emb,
                 schema_version=self.schema_version,
+                url=getattr(config, "QDRANT_URL", None),
+                api_key=getattr(config, "QDRANT_API_KEY", None),
             )
         else:
             self._impl = NumPyIndexStore(
